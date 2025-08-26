@@ -416,3 +416,30 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# -----------------------------------------------------------------------------
+# Project-specific ignores
+# - Development appsettings that may contain secrets
+# - Frontend build & node_modules
+# - Local build folders under src (extra safety)
+# - IDE/editor local files
+# -----------------------------------------------------------------------------
+
+# Ignore WebApi development settings which may contain secrets
+**/appsettings.Development.json
+
+# Frontend (React) local artifacts (also covered in frontend/.gitignore but keep here for safety)
+/src/Presentation/frontend/node_modules/
+/src/Presentation/frontend/build/
+/src/Presentation/frontend/.env*
+
+# Extra safety: ignore build outputs under src
+/src/**/bin/
+/src/**/obj/
+
+# IDEs
+.idea/
+
+# Windows thumbnail cache
+Thumbs.db
+

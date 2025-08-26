@@ -1,0 +1,6 @@
+@UniversityDashboard.WebApi_HostAddress = http://localhost:5096
+
+GET {{UniversityDashboard.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
