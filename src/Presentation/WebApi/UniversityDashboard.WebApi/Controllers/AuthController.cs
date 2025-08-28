@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UniversityDashBoardProject.Application.DTOs.Auth;
 using UniversityDashBoardProject.Application.Features.Auth.Commands;
+using Serilog;
 
 namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
 {
@@ -11,6 +12,7 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IMediator _mediator;
+        private readonly Serilog.ILogger _logger = Log.ForContext<AuthController>();
 
         public AuthController(IMediator mediator)
         {
@@ -20,9 +22,19 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            var command = new LoginCommand { Request = request };
-            var result = await _mediator.Send(command);
-            return Ok(result);
+            try
+            {
+                _logger.Information("Login request received for user: {Username}", request.Username);
+                var command = new LoginCommand { Request = request };
+                var result = await _mediator.Send(command);
+                _logger.Information("Login successful for user: {Username}", request.Username);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Login failed for user: {Username}", request.Username);
+                return Unauthorized(new { message = "Invalid credentials" });
+            }
         }
 
         [HttpPost("register")]
@@ -45,10 +57,15 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
         [HttpPost("revoke")]
         public async Task<IActionResult> Revoke()
         {
-            var username = User.Identity!.Name;
-            var command = new RevokeTokenCommand { Username = username! };
+            var username = User.Identity?.Name;
+            if (string.IsNullOrEmpty(username))
+            {
+                return BadRequest(new { error = "Username not found in token" });
+            }
+            
+            var command = new RevokeTokenCommand { Username = username };
             var result = await _mediator.Send(command);
-            return Ok(new { message = "Token revoked successfully" });
+            return Ok(new { message = "Token revoked successfully", result });
         }
     }
 }
