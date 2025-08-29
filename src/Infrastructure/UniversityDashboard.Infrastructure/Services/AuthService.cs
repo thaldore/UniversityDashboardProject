@@ -179,5 +179,60 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
             return true;
         }
+
+        public async Task<UserProfileDto> GetUserProfileAsync(int userId)
+        {
+            _logger.Information("Getting detailed profile for user ID: {UserId}", userId);
+            
+            var user = await _context.Users
+                .Include(u => u.Department)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+                
+            if (user == null)
+            {
+                _logger.Warning("User not found with ID: {UserId}", userId);
+                throw new Exception("User not found");
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            return new UserProfileDto
+            {
+                Id = user.Id,
+                Username = user.UserName!,
+                Email = user.Email!,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                DepartmentId = user.DepartmentId,
+                DepartmentName = user.Department?.DepartmentName,
+                Roles = roles.ToList(),
+                CreatedAt = user.CreatedAt,
+                LastLoginAt = null, // Bu alanı şimdilik null bırakıyoruz
+                IsActive = user.IsActive
+            };
+        }
+
+        public async Task<UserSummaryDto> GetUserSummaryAsync(int userId)
+        {
+            _logger.Information("Getting summary profile for user ID: {UserId}", userId);
+            
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null)
+            {
+                _logger.Warning("User not found with ID: {UserId}", userId);
+                throw new Exception("User not found");
+            }
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            return new UserSummaryDto
+            {
+                Id = user.Id,
+                Username = user.UserName!,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Roles = roles.ToList()
+            };
+        }
     }
 }

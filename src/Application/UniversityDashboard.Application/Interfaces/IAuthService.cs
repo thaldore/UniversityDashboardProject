@@ -8,5 +8,9 @@ namespace UniversityDashBoardProject.Application.Interfaces
         Task<AuthResponse> RegisterAsync(RegisterRequest request);
         Task<AuthResponse> RefreshTokenAsync(RefreshTokenRequest request);
         Task<bool> RevokeTokenAsync(string username);
+        
+        // Profil metodları
+        Task<UserProfileDto> GetUserProfileAsync(int userId);
+        Task<UserSummaryDto> GetUserSummaryAsync(int userId);
     }
 }

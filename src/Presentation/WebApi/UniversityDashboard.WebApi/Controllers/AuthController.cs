@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UniversityDashBoardProject.Application.DTOs.Auth;
 using UniversityDashBoardProject.Application.Features.Auth.Commands;
+using UniversityDashBoardProject.Application.Interfaces;
 using Serilog;
+using System.Security.Claims;
 
 namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
 {
@@ -12,11 +14,13 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IMediator _mediator;
+        private readonly IAuthService _authService;
         private readonly Serilog.ILogger _logger = Log.ForContext<AuthController>();
 
-        public AuthController(IMediator mediator)
+        public AuthController(IMediator mediator, IAuthService authService)
         {
             _mediator = mediator;
+            _authService = authService;
         }
 
         [HttpPost("login")]
@@ -66,6 +70,52 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
             var command = new RevokeTokenCommand { Username = username };
             var result = await _mediator.Send(command);
             return Ok(new { message = "Token revoked successfully", result });
+        }
+
+        [Authorize]
+        [HttpGet("profile")]
+        public async Task<IActionResult> GetProfile()
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+                {
+                    return BadRequest(new { error = "User ID not found in token" });
+                }
+
+                _logger.Information("Profile request received for user ID: {UserId}", userId);
+                var result = await _authService.GetUserProfileAsync(userId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Failed to get user profile");
+                return StatusCode(500, new { message = "Failed to get user profile" });
+            }
+        }
+
+        [Authorize]
+        [HttpGet("summary")]
+        public async Task<IActionResult> GetSummary()
+        {
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+                {
+                    return BadRequest(new { error = "User ID not found in token" });
+                }
+
+                _logger.Information("Summary request received for user ID: {UserId}", userId);
+                var result = await _authService.GetUserSummaryAsync(userId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Failed to get user summary");
+                return StatusCode(500, new { message = "Failed to get user summary" });
+            }
         }
     }
 }
