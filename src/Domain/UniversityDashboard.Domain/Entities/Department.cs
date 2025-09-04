@@ -11,5 +11,6 @@ namespace UniversityDashBoardProject.Domain.Entities
         public virtual Department? Parent { get; set; }
         public virtual ICollection<Department> Children { get; set; } = new List<Department>();
         public virtual ICollection<ApplicationUser> Users { get; set; } = new List<ApplicationUser>();
+        public virtual ICollection<Indicator> Indicators { get; set; } = new List<Indicator>();
     }
 }

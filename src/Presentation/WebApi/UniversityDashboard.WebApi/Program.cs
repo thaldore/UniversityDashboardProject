@@ -122,6 +122,7 @@ builder.Services.AddAuthentication(options =>
 // Services
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IIndicatorService, IndicatorService>();
 
 // MediatR - handlers live in Application project
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(UniversityDashBoardProject.Application.Features.Auth.Commands.LoginCommand).Assembly));

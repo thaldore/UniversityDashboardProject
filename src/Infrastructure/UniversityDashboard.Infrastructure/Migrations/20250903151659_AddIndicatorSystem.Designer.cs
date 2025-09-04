@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UniversityDashBoardProject.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using UniversityDashBoardProject.Infrastructure.Persistence;
 namespace UniversityDashboard.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250903151659_AddIndicatorSystem")]
+    partial class AddIndicatorSystem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -284,11 +287,11 @@ namespace UniversityDashboard.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("DepartmentId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Description")
                         .HasColumnType("text");
+
+                    b.Property<int>("GroupId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("IndicatorCode")
                         .IsRequired()
@@ -325,7 +328,7 @@ namespace UniversityDashboard.Infrastructure.Migrations
 
                     b.HasIndex("CreatedBy");
 
-                    b.HasIndex("DepartmentId");
+                    b.HasIndex("GroupId");
 
                     b.HasIndex("IndicatorCode")
                         .IsUnique();
@@ -380,6 +383,38 @@ namespace UniversityDashboard.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("IndicatorData");
+                });
+
+            modelBuilder.Entity("UniversityDashBoardProject.Domain.Entities.IndicatorGroup", b =>
+                {
+                    b.Property<int>("GroupId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("GroupId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DepartmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<string>("GroupName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("GroupId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.ToTable("IndicatorGroups");
                 });
 
             modelBuilder.Entity("UniversityDashBoardProject.Domain.Entities.IndicatorHistoricalData", b =>
@@ -527,9 +562,9 @@ namespace UniversityDashboard.Infrastructure.Migrations
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("UniversityDashBoardProject.Domain.Entities.Department", "Department")
+                    b.HasOne("UniversityDashBoardProject.Domain.Entities.IndicatorGroup", "Group")
                         .WithMany("Indicators")
-                        .HasForeignKey("DepartmentId")
+                        .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -542,7 +577,7 @@ namespace UniversityDashboard.Infrastructure.Migrations
 
                     b.Navigation("Creator");
 
-                    b.Navigation("Department");
+                    b.Navigation("Group");
 
                     b.Navigation("NotificationUser");
                 });
@@ -564,6 +599,17 @@ namespace UniversityDashboard.Infrastructure.Migrations
                     b.Navigation("EnteredByUser");
 
                     b.Navigation("Indicator");
+                });
+
+            modelBuilder.Entity("UniversityDashBoardProject.Domain.Entities.IndicatorGroup", b =>
+                {
+                    b.HasOne("UniversityDashBoardProject.Domain.Entities.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Department");
                 });
 
             modelBuilder.Entity("UniversityDashBoardProject.Domain.Entities.IndicatorHistoricalData", b =>
@@ -621,8 +667,6 @@ namespace UniversityDashboard.Infrastructure.Migrations
                 {
                     b.Navigation("Children");
 
-                    b.Navigation("Indicators");
-
                     b.Navigation("Users");
                 });
 
@@ -633,6 +677,11 @@ namespace UniversityDashboard.Infrastructure.Migrations
                     b.Navigation("HistoricalData");
 
                     b.Navigation("RootValues");
+                });
+
+            modelBuilder.Entity("UniversityDashBoardProject.Domain.Entities.IndicatorGroup", b =>
+                {
+                    b.Navigation("Indicators");
                 });
 #pragma warning restore 612, 618
         }
