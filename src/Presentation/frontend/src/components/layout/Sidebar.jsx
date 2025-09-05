@@ -13,6 +13,24 @@ const Sidebar = () => {
       description: 'Ana sayfa'
     },
     { 
+      path: '/indicators', 
+      label: 'Gösterge Listesi', 
+      icon: '📊',
+      description: 'Gösterge yönetimi'
+    },
+    { 
+      path: '/indicators/new', 
+      label: 'Yeni Gösterge', 
+      icon: '➕',
+      description: 'Yeni gösterge oluştur'
+    },
+    { 
+      path: '/indicators/data-entry', 
+      label: 'Veri Girişi', 
+      icon: '📝',
+      description: 'Gösterge verilerini gir'
+    },
+    { 
       path: '/auth/profile', 
       label: 'Profil', 
       icon: '👤',

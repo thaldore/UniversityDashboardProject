@@ -22,14 +22,16 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('token');
         const userData = localStorage.getItem('user');
         
-        if (token && userData) {
+        if (token && userData && userData !== 'undefined') {
           const parsedUser = JSON.parse(userData);
           setUser(parsedUser);
           
           // Token'ın geçerliliğini kontrol et
           try {
+            // Basit bir API çağrısı yap token'ı test etmek için
             await authService.getProfile(parsedUser.id);
-          } catch (error) {
+          } catch (tokenError) {
+            console.log('Token validation failed, clearing auth data:', tokenError.message);
             // Token geçersiz, temizle
             localStorage.removeItem('token');
             localStorage.removeItem('refreshToken');
@@ -39,7 +41,11 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
-        setError('Kimlik doğrulama başlatılamadı');
+        // Bozuk verileri temizle
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -54,15 +60,28 @@ export const AuthProvider = ({ children }) => {
       setError('');
       
       const response = await authService.login(credentials);
+      const responseData = response.data; // Axios response.data kullan
       
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('refreshToken', response.refreshToken);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      // Backend response yapısına göre düzenle
+      const token = responseData.token || responseData.accessToken;
+      const refreshToken = responseData.refreshToken;
+      const userData = responseData.user || responseData;
       
-      setUser(response.user);
-      return response;
+      if (token) {
+        localStorage.setItem('token', token);
+        if (refreshToken) {
+          localStorage.setItem('refreshToken', refreshToken);
+        }
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        setUser(userData);
+        return responseData;
+      } else {
+        throw new Error('Token alınamadı');
+      }
     } catch (error) {
-      const errorMessage = error.message || 'Giriş yapılırken bir hata oluştu';
+      console.error('Login error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Giriş yapılırken bir hata oluştu';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -76,15 +95,27 @@ export const AuthProvider = ({ children }) => {
       setError('');
       
       const response = await authService.register(userData);
+      const responseData = response.data;
       
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('refreshToken', response.refreshToken);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      const token = responseData.token || responseData.accessToken;
+      const refreshToken = responseData.refreshToken;
+      const user = responseData.user || responseData;
       
-      setUser(response.user);
-      return response;
+      if (token) {
+        localStorage.setItem('token', token);
+        if (refreshToken) {
+          localStorage.setItem('refreshToken', refreshToken);
+        }
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        setUser(user);
+        return responseData;
+      } else {
+        throw new Error('Token alınamadı');
+      }
     } catch (error) {
-      const errorMessage = error.message || 'Kayıt olurken bir hata oluştu';
+      console.error('Register error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Kayıt olurken bir hata oluştu';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {

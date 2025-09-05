@@ -6,6 +6,10 @@ import HomePage from './pages/dashboard/HomePage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ProfilePage from './pages/auth/ProfilePage';
+import IndicatorListPage from './pages/indicators/IndicatorListPage';
+import NewIndicatorPage from './pages/indicators/NewIndicatorPage';
+import EditIndicatorPage from './pages/indicators/EditIndicatorPage';
+import DataEntryPage from './pages/indicators/DataEntryPage';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
 // CSS imports
@@ -13,6 +17,9 @@ import './styles/globals.css';
 import './styles/components/layout.css';
 import './styles/components/auth.css';
 import './styles/components/dashboard.css';
+import './styles/pages/indicator-list.css';
+import './styles/pages/indicator-form.css';
+import './styles/pages/data-entry.css';
 
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -70,6 +77,40 @@ function AppRoutes() {
           element={
             <PrivateRoute>
               <ProfilePage />
+            </PrivateRoute>
+          } 
+        />
+        
+        {/* Indicator Routes */}
+        <Route 
+          path="/indicators" 
+          element={
+            <PrivateRoute>
+              <IndicatorListPage />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/indicators/new" 
+          element={
+            <PrivateRoute>
+              <NewIndicatorPage />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/indicators/edit/:id" 
+          element={
+            <PrivateRoute>
+              <EditIndicatorPage />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/indicators/data-entry" 
+          element={
+            <PrivateRoute>
+              <DataEntryPage />
             </PrivateRoute>
           } 
         />

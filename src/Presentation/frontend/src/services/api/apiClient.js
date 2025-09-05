@@ -1,97 +1,90 @@
+import axios from 'axios';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7001/api';
 
 class ApiClient {
   constructor() {
-    this.baseURL = API_BASE_URL;
-  }
-
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const token = localStorage.getItem('token');
-    
-    const config = {
+    this.client = axios.create({
+      baseURL: API_BASE_URL,
       headers: {
         'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
       },
-      ...options,
-    };
+    });
 
-    try {
-      const response = await fetch(url, config);
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-          // Token süresi dolmuş, refresh token dene
+    // Request interceptor
+    this.client.interceptors.request.use(
+      (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    // Response interceptor
+    this.client.interceptors.response.use(
+      (response) => {
+        return response;
+      },
+      async (error) => {
+        const originalRequest = error.config;
+
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
+
           const refreshToken = localStorage.getItem('refreshToken');
           if (refreshToken) {
             try {
-              const refreshResponse = await fetch(`${this.baseURL}/auth/refresh-token`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ refreshToken }),
+              const refreshResponse = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
+                refreshToken
               });
 
-              if (refreshResponse.ok) {
-                const refreshData = await refreshResponse.json();
-                localStorage.setItem('token', refreshData.token);
-                localStorage.setItem('refreshToken', refreshData.refreshToken);
-                
-                // Orijinal isteği yeniden dene
-                config.headers.Authorization = `Bearer ${refreshData.token}`;
-                const retryResponse = await fetch(url, config);
-                
-                if (retryResponse.ok) {
-                  return await retryResponse.json();
-                }
-              }
+              const { token, refreshToken: newRefreshToken } = refreshResponse.data;
+              localStorage.setItem('token', token);
+              localStorage.setItem('refreshToken', newRefreshToken);
+
+              // Retry original request
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+              return this.client(originalRequest);
             } catch (refreshError) {
               console.error('Token refresh failed:', refreshError);
+              this.logout();
             }
+          } else {
+            this.logout();
           }
-          
-          // Refresh başarısız, çıkış yap
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
-          window.location.href = '/auth/login';
-          throw new Error('Oturum süresi dolmuş, lütfen tekrar giriş yapın');
         }
-        
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
 
-      return await response.json();
-    } catch (error) {
-      console.error('API request failed:', error);
-      throw error;
-    }
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
+    window.location.href = '/auth/login';
   }
 
   get(endpoint) {
-    return this.request(endpoint, { method: 'GET' });
+    return this.client.get(endpoint);
   }
 
   post(endpoint, data) {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return this.client.post(endpoint, data);
   }
 
   put(endpoint, data) {
-    return this.request(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    return this.client.put(endpoint, data);
   }
 
   delete(endpoint) {
-    return this.request(endpoint, { method: 'DELETE' });
+    return this.client.delete(endpoint);
   }
 }
 
