@@ -1,0 +1,395 @@
+/* Gösterge Form Sayfası - Ultra Kompakt Tek Ekran */
+.indicator-form-page {
+    padding: 1rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    min-height: 100vh;
+}
+
+/* Sayfa Başlığı - Mini */
+.page-header {
+    margin-bottom: 1rem;
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.header-content h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 0.125rem 0;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.header-content p {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin: 0;
+}
+
+/* Form - Ultra Kompakt Grid */
+.indicator-form {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+}
+
+/* Form Bölümleri - Grid Yapısı */
+.form-section {
+    padding: 1rem;
+    border-right: 1px solid #f1f5f9;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.form-section:nth-child(even) {
+    border-right: none;
+}
+
+.form-section:last-child,
+.form-section:nth-last-child(2) {
+    border-bottom: none;
+}
+
+/* Form Actions - Full Width */
+.form-actions {
+    grid-column: 1 / -1;
+    border-right: none;
+    border-bottom: none;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+}
+
+.section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 0.75rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.section-title::before {
+    content: '';
+    width: 2px;
+    height: 14px;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    border-radius: 1px;
+}
+
+/* Form Grid - Tek Sütun */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    align-items: start;
+}
+
+.form-grid-2 {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.form-grid-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.75rem;
+}
+
+/* Form Group - Minimal */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+/* Form Label - Mini */
+.form-label {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.form-label.required::after {
+    content: ' *';
+    color: #ef4444;
+}
+
+/* Form Input - Kompakt */
+.form-input,
+.form-select,
+.form-textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: #f9fafb;
+    transition: all 0.2s ease;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    background: white;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.form-textarea {
+    min-height: 60px;
+    resize: vertical;
+}
+
+/* Checkbox - Mini */
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 0.25rem;
+}
+
+.checkbox-input {
+    width: 14px;
+    height: 14px;
+}
+
+.checkbox-label {
+    font-size: 0.8rem;
+    color: #374151;
+    margin: 0;
+}
+
+/* Dinamik Listeler - Kompakt */
+.dynamic-list {
+    margin-top: 0.75rem;
+}
+
+.dynamic-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.dynamic-item:last-child {
+    margin-bottom: 0;
+}
+
+.dynamic-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.dynamic-item-title {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.8rem;
+}
+
+.remove-btn {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.remove-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.remove-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Add Button - Mini */
+.add-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px dashed #10b981;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.add-btn:hover {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: #059669;
+}
+
+.add-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Form Actions - Kompakt */
+.form-actions {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-secondary {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+.btn-secondary:hover {
+    background: #e2e8f0;
+}
+
+.btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+}
+
+/* Error Message */
+.error-message {
+    background: #fef2f2;
+    color: #dc2626;
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    border: 1px solid #fecaca;
+    font-size: 0.8rem;
+}
+
+/* Responsive - Tek Ekran */
+@media (max-width: 1200px) {
+    .indicator-form {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-section {
+        border-right: none;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    
+    .form-section:last-child {
+        border-bottom: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .indicator-form-page {
+        padding: 0.75rem;
+    }
+    
+    .page-header {
+        padding: 0.75rem;
+    }
+    
+    .header-content h1 {
+        font-size: 1.5rem;
+    }
+    
+    .form-section {
+        padding: 0.75rem;
+    }
+    
+    .form-grid-2,
+    .form-grid-3 {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+        padding: 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .indicator-form-page {
+        padding: 0.5rem;
+    }
+    
+    .page-header {
+        padding: 0.5rem;
+    }
+    
+    .form-section {
+        padding: 0.5rem;
+    }
+    
+    .header-content h1 {
+        font-size: 1.25rem;
+    }
+}

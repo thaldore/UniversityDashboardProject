@@ -3,16 +3,19 @@ using UniversityDashBoardProject.Application.DTOs.Indicator;
 using UniversityDashBoardProject.Application.Interfaces;
 using UniversityDashBoardProject.Domain.Entities;
 using UniversityDashBoardProject.Infrastructure.Persistence;
+using UniversityDashBoardProject.Domain.Services;
 
 namespace UniversityDashBoardProject.Infrastructure.Services
 {
     public class IndicatorService : IIndicatorService
     {
         private readonly ApplicationDbContext _context;
+        private readonly IPeriodCalculationService _periodCalculationService;
 
-        public IndicatorService(ApplicationDbContext context)
+        public IndicatorService(ApplicationDbContext context, IPeriodCalculationService periodCalculationService)
         {
             _context = context;
+            _periodCalculationService = periodCalculationService;
         }
 
         public async Task<int> CreateIndicatorAsync(CreateIndicatorRequest request, int createdBy)
@@ -246,10 +249,29 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
             var indicators = await query.ToListAsync();
 
-            var result = indicators.Select(i => 
+            // Periyot hesaplama servisini kullanarak sadece veri girişi yapılabilecek göstergeleri filtrele
+            var filteredIndicators = indicators.Where(i => 
+                i.PeriodStartDate.HasValue && 
+                _periodCalculationService.IsDataEntryAllowed(i.PeriodStartDate.Value, i.PeriodType, year, period)
+            ).ToList();
+
+            var result = filteredIndicators.Select(i => 
             {
                 var existingData = i.Data.FirstOrDefault();
                 
+                // Historical data'yı tarih sırasına göre sırala (en yeni en başta)
+                var sortedHistoricalData = i.HistoricalData
+                    .OrderByDescending(h => ExtractYearFromPeriodLabel(h.PeriodLabel))
+                    .ThenByDescending(h => ExtractPeriodFromPeriodLabel(h.PeriodLabel))
+                    .Take(5) // Sadece son 5 kayıt
+                    .Select(hd => new HistoricalDataDto
+                    {
+                        HistoricalId = hd.HistoricalId,
+                        PeriodLabel = hd.PeriodLabel,
+                        Value = hd.Value,
+                        Description = hd.Description
+                    }).ToList();
+
                 return new IndicatorDataEntryDto
                 {
                     IndicatorId = i.IndicatorId,
@@ -262,13 +284,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     Notes = existingData?.Notes,
                     Year = year,
                     Period = period,
-                    HistoricalData = i.HistoricalData.Select(hd => new HistoricalDataDto
-                    {
-                        HistoricalId = hd.HistoricalId,
-                        PeriodLabel = hd.PeriodLabel,
-                        Value = hd.Value,
-                        Description = hd.Description
-                    }).ToList()
+                    HistoricalData = sortedHistoricalData
                 };
             }).ToList();
 
@@ -279,10 +295,19 @@ namespace UniversityDashBoardProject.Infrastructure.Services
         {
             foreach (var dataItem in request.DataItems)
             {
-                var existingData = await _context.IndicatorData
-                    .FirstOrDefaultAsync(d => d.IndicatorId == dataItem.IndicatorId 
-                                           && d.Year == dataItem.Year 
-                                           && d.Period == dataItem.Period);
+                var indicator = await _context.Indicators
+                    .Include(i => i.HistoricalData)
+                    .Include(i => i.Data) // Tüm mevcut veri kayıtlarını dahil et
+                    .FirstOrDefaultAsync(i => i.IndicatorId == dataItem.IndicatorId);
+
+                if (indicator == null) continue;
+
+                // Yeni periyot için tarih string'i oluştur
+                var newPeriodLabel = $"{dataItem.Year}-P{dataItem.Period}";
+
+                // Bu periyot için mevcut veri var mı kontrol et
+                var existingData = indicator.Data
+                    .FirstOrDefault(d => d.Year == dataItem.Year && d.Period == dataItem.Period);
 
                 if (existingData != null)
                 {
@@ -294,7 +319,10 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 }
                 else
                 {
-                    // Yeni veri oluştur
+                    // Yeni veri oluşturmadan önce eski verileri historical'a taşı
+                    await MoveExistingDataToHistorical(indicator, dataItem.Year, dataItem.Period);
+
+                    // Yeni veri kaydet
                     var newData = new IndicatorData
                     {
                         IndicatorId = dataItem.IndicatorId,
@@ -314,6 +342,140 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        /// <summary>
+        /// Mevcut IndicatorData kayıtlarını historical data'ya taşır
+        /// </summary>
+        private async Task MoveExistingDataToHistorical(Indicator indicator, int newYear, int newPeriod)
+        {
+            // Tüm mevcut IndicatorData kayıtlarını al
+            var existingDataRecords = await _context.IndicatorData
+                .Where(d => d.IndicatorId == indicator.IndicatorId)
+                .OrderByDescending(d => d.Year)
+                .ThenByDescending(d => d.Period)
+                .ToListAsync();
+
+            foreach (var dataRecord in existingDataRecords)
+            {
+                var periodLabel = $"{dataRecord.Year}-P{dataRecord.Period}";
+                
+                // Bu period label ile historical data var mı kontrol et
+                var existingHistorical = await _context.IndicatorHistoricalData
+                    .FirstOrDefaultAsync(h => h.IndicatorId == indicator.IndicatorId && 
+                                            h.PeriodLabel == periodLabel);
+
+                if (existingHistorical == null)
+                {
+                    // Historical data'ya ekle
+                    var historicalData = new IndicatorHistoricalData
+                    {
+                        IndicatorId = indicator.IndicatorId,
+                        PeriodLabel = periodLabel,
+                        Value = dataRecord.Value ?? 0,
+                        Description = $"{dataRecord.Year} yılı {dataRecord.Period}. periyot verisi"
+                    };
+
+                    _context.IndicatorHistoricalData.Add(historicalData);
+                }
+                else
+                {
+                    // Mevcut historical data'yı güncelle
+                    existingHistorical.Value = dataRecord.Value ?? 0;
+                    existingHistorical.Description = $"{dataRecord.Year} yılı {dataRecord.Period}. periyot verisi";
+                }
+            }
+
+            // Mevcut IndicatorData kayıtlarını sil (yeni veri eklenecek)
+            _context.IndicatorData.RemoveRange(existingDataRecords);
+
+            // Historical data'da fazla kayıt varsa temizle
+            await CleanupHistoricalData(indicator.IndicatorId, indicator.PeriodType);
+        }
+
+        /// <summary>
+        /// Historical data'da fazla kayıtları temizler ve sıralama yapar
+        /// </summary>
+        private async Task CleanupHistoricalData(int indicatorId, Domain.Enums.PeriodType periodType)
+        {
+            var maxRecords = GetMaxHistoricalRecords(periodType);
+            
+            // Tüm historical verileri al ve tarih sırasına göre sırala
+            var allHistoricalData = await _context.IndicatorHistoricalData
+                .Where(h => h.IndicatorId == indicatorId)
+                .ToListAsync();
+
+            // Period label'a göre sırala (en yeni en başta)
+            var sortedData = allHistoricalData
+                .OrderByDescending(h => ExtractYearFromPeriodLabel(h.PeriodLabel))
+                .ThenByDescending(h => ExtractPeriodFromPeriodLabel(h.PeriodLabel))
+                .ToList();
+
+            // Sadece en son N kaydı tut
+            if (sortedData.Count > maxRecords)
+            {
+                var recordsToKeep = sortedData.Take(maxRecords).ToList();
+                var recordsToRemove = allHistoricalData.Except(recordsToKeep);
+                
+                _context.IndicatorHistoricalData.RemoveRange(recordsToRemove);
+            }
+        }
+
+        /// <summary>
+        /// Period label'dan yıl çıkarır
+        /// </summary>
+        private int ExtractYearFromPeriodLabel(string periodLabel)
+        {
+            if (string.IsNullOrEmpty(periodLabel)) return 0;
+            
+            // "2025-P3" veya "2023 Yılı" formatlarını handle et
+            if (periodLabel.Contains("-P"))
+            {
+                var parts = periodLabel.Split('-');
+                if (parts.Length > 0 && int.TryParse(parts[0], out int year))
+                    return year;
+            }
+            else if (periodLabel.Contains("Yılı"))
+            {
+                var parts = periodLabel.Split(' ');
+                if (parts.Length > 0 && int.TryParse(parts[0], out int year))
+                    return year;
+            }
+            
+            return 0;
+        }
+
+        /// <summary>
+        /// Period label'dan periyot numarası çıkarır
+        /// </summary>
+        private int ExtractPeriodFromPeriodLabel(string periodLabel)
+        {
+            if (string.IsNullOrEmpty(periodLabel)) return 0;
+            
+            // "2025-P3" formatını handle et
+            if (periodLabel.Contains("-P"))
+            {
+                var parts = periodLabel.Split('P');
+                if (parts.Length > 1 && int.TryParse(parts[1], out int period))
+                    return period;
+            }
+            
+            return 1; // Default olarak 1. periyot
+        }
+
+        /// <summary>
+        /// Periyot tipine göre tutulacak maksimum geçmiş veri sayısını döner
+        /// </summary>
+        private int GetMaxHistoricalRecords(Domain.Enums.PeriodType periodType)
+        {
+            return periodType switch
+            {
+                Domain.Enums.PeriodType.Quarter => 8,    // 2 yıllık geçmiş (8 çeyrek)
+                Domain.Enums.PeriodType.HalfYear => 6,   // 3 yıllık geçmiş (6 yarıyıl)
+                Domain.Enums.PeriodType.Year => 5,       // 5 yıllık geçmiş
+                Domain.Enums.PeriodType.TwoYear => 5,    // 10 yıllık geçmiş (5 iki yıllık periyot)
+                _ => 8
+            };
         }
 
         public async Task<List<DepartmentDto>> GetDepartmentsAsync()

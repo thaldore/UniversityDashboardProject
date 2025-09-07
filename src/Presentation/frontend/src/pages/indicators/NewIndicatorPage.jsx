@@ -4,7 +4,7 @@ import indicatorService from '../../services/api/indicatorService';
 import { IndicatorDataType, PeriodType, getIndicatorDataTypeText, getPeriodTypeText } from '../../services/utils/constants';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorMessage from '../../components/common/ErrorMessage';
-import '../../styles/pages/indicator-form.css';
+import '../../styles/pages/indicator-form-compact.css';
 
 const NewIndicatorPage = () => {
     const navigate = useNavigate();

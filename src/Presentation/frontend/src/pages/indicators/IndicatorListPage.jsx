@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import indicatorService from '../../services/api/indicatorService';
 import { formatDate } from '../../services/utils/constants';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -7,6 +7,7 @@ import ErrorMessage from '../../components/common/ErrorMessage';
 import '../../styles/pages/indicator-list.css';
 
 const IndicatorListPage = () => {
+    const navigate = useNavigate();
     const [indicators, setIndicators] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -165,42 +166,25 @@ const IndicatorListPage = () => {
                                     <span className="created-date">{formatDate(indicator.createdAt)}</span>
                                 </td>
                                 <td>
-                                    <div className="actions-dropdown">
-                                        <button className="actions-trigger">
+                                    <div className="actions-inline">
+                                        <button 
+                                            className="action-btn edit-btn"
+                                            onClick={() => navigate(`/indicators/edit/${indicator.indicatorId}`)}
+                                            title="Düzenle"
+                                        >
                                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </button>
-                                        <div className="actions-menu">
-                                            <Link 
-                                                to={`/indicators/${indicator.indicatorId}`}
-                                                className="action-item view"
-                                            >
-                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                </svg>
-                                                Görüntüle
-                                            </Link>
-                                            <Link 
-                                                to={`/indicators/edit/${indicator.indicatorId}`}
-                                                className="action-item edit"
-                                            >
-                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                </svg>
-                                                Düzenle
-                                            </Link>
-                                            <button 
-                                                onClick={() => handleDelete(indicator.indicatorId)}
-                                                className="action-item delete"
-                                            >
-                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                </svg>
-                                                Sil
-                                            </button>
-                                        </div>
+                                        <button 
+                                            className="action-btn delete-btn"
+                                            onClick={() => handleDelete(indicator.indicatorId)}
+                                            title="Sil"
+                                        >
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>

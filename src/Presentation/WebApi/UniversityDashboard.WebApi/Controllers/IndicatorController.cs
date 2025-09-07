@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using UniversityDashBoardProject.Application.DTOs.Indicator;
 using UniversityDashBoardProject.Application.Features.Indicators.Commands;
 using UniversityDashBoardProject.Application.Features.Indicators.Queries;
+using UniversityDashBoardProject.Domain.Services;
 using System.Security.Claims;
 
 namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
@@ -14,10 +15,12 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
     public class IndicatorController : ControllerBase
     {
         private readonly IMediator _mediator;
+        private readonly IPeriodCalculationService _periodCalculationService;
 
-        public IndicatorController(IMediator mediator)
+        public IndicatorController(IMediator mediator, IPeriodCalculationService periodCalculationService)
         {
             _mediator = mediator;
+            _periodCalculationService = periodCalculationService;
         }
 
         /// <summary>
@@ -177,6 +180,66 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
             catch (Exception ex)
             {
                 return BadRequest(new { Message = "Veriler kaydedilirken hata oluştu.", Error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Belirtilen gösterge için mevcut ve sonraki veri giriş periyotlarını getirir
+        /// </summary>
+        [HttpGet("periods/{indicatorId}")]
+        public async Task<IActionResult> GetIndicatorPeriods(int indicatorId)
+        {
+            try
+            {
+                var query = new GetIndicatorByIdQuery { Id = indicatorId };
+                var indicator = await _mediator.Send(query);
+                
+                if (indicator == null || !indicator.PeriodStartDate.HasValue)
+                    return NotFound(new { Message = "Gösterge bulunamadı veya başlangıç tarihi tanımlı değil." });
+
+                var currentDate = DateTime.UtcNow;
+                var currentYear = currentDate.Year;
+                var currentPeriod = (currentDate.Month - 1) / 3 + 1; // Çeyrek hesaplama
+
+                // Son veri giriş periyodunu bul
+                var lastPeriod = _periodCalculationService.GetLastDataEntryPeriod(
+                    indicator.PeriodStartDate.Value, 
+                    indicator.PeriodType, 
+                    currentDate
+                );
+
+                // Sonraki veri giriş periyodunu bul
+                var nextPeriod = _periodCalculationService.GetNextDataEntryPeriod(
+                    indicator.PeriodStartDate.Value, 
+                    indicator.PeriodType, 
+                    lastPeriod.year, 
+                    lastPeriod.period
+                );
+
+                // Mevcut periyotta veri girişi yapılabilir mi kontrol et
+                var canEnterCurrentPeriod = _periodCalculationService.IsDataEntryAllowed(
+                    indicator.PeriodStartDate.Value, 
+                    indicator.PeriodType, 
+                    currentYear, 
+                    currentPeriod
+                );
+
+                return Ok(new
+                {
+                    IndicatorId = indicatorId,
+                    IndicatorCode = indicator.IndicatorCode,
+                    IndicatorName = indicator.IndicatorName,
+                    PeriodType = indicator.PeriodType.ToString(),
+                    PeriodStartDate = indicator.PeriodStartDate,
+                    LastDataEntryPeriod = new { Year = lastPeriod.year, Period = lastPeriod.period },
+                    NextDataEntryPeriod = new { Year = nextPeriod.year, Period = nextPeriod.period },
+                    CanEnterCurrentPeriod = canEnterCurrentPeriod,
+                    CurrentPeriod = new { Year = currentYear, Period = currentPeriod }
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = "Periyot bilgileri getirilirken hata oluştu.", Error = ex.Message });
             }
         }
 

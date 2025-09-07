@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import indicatorService from '../../services/api/indicatorService';
+import periodService from '../../services/periodService';
 import { DataStatus, getDataStatusBadgeClass, formatValue } from '../../services/utils/constants';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorMessage from '../../components/common/ErrorMessage';
-import '../../styles/pages/data-entry.css';
+import '../../styles/pages/data-entry-compact.css';
 
 const DataEntryPage = () => {
     const navigate = useNavigate();
@@ -12,10 +13,13 @@ const DataEntryPage = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [indicators, setIndicators] = useState([]);
+    const [availablePeriods, setAvailablePeriods] = useState([]);
     
+    // Get current period as default
+    const currentPeriod = periodService.getCurrentPeriod();
     const [period, setPeriod] = useState({
-        year: new Date().getFullYear(),
-        period: 1
+        year: currentPeriod.year,
+        period: currentPeriod.period
     });
     
     const [formData, setFormData] = useState({
@@ -25,7 +29,19 @@ const DataEntryPage = () => {
 
     useEffect(() => {
         loadDataEntryForm();
+        loadAvailablePeriods();
     }, [period.year, period.period]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const loadAvailablePeriods = () => {
+        // Generate periods for the last 3 years and next 2 years
+        const currentYear = new Date().getFullYear();
+        const periods = periodService.generateAvailablePeriods(
+            currentYear - 3,
+            currentYear + 2,
+            'Quarter' // Default to quarterly periods
+        );
+        setAvailablePeriods(periods);
+    };
 
     const loadDataEntryForm = async () => {
         try {
@@ -54,13 +70,6 @@ const DataEntryPage = () => {
         } finally {
             setLoading(false);
         }
-    };
-
-    const handlePeriodChange = (field, value) => {
-        setPeriod(prev => ({
-            ...prev,
-            [field]: parseInt(value)
-        }));
     };
 
     const handleDataItemChange = (indicatorId, field, value) => {
@@ -175,46 +184,42 @@ const DataEntryPage = () => {
                 </div>
             )}
 
-            {/* Dönem Seçimi */}
-            <div className="period-selection">
-                <h2 className="section-title">Dönem Seçimi</h2>
-                <div className="period-controls">
-                    <div className="period-group">
-                        <label htmlFor="year" className="period-label">Yıl</label>
-                        <select
-                            id="year"
-                            value={period.year}
-                            onChange={(e) => handlePeriodChange('year', e.target.value)}
-                            className="period-select"
-                            disabled={loading}
-                        >
-                            {Array.from({ length: 10 }, (_, i) => {
-                                const year = new Date().getFullYear() - 5 + i;
-                                return (
-                                    <option key={year} value={year}>
-                                        {year}
+            <div className="data-entry-container">
+                {/* Dönem Seçimi */}
+                <div className="period-selection">
+                    <h2 className="section-title">Dönem Seçimi</h2>
+                    <div className="period-controls">
+                        <div className="period-group">
+                            <label htmlFor="period-select" className="period-label">Dönem</label>
+                            <select
+                                id="period-select"
+                                value={`${period.year}-${period.period}`}
+                                onChange={(e) => {
+                                    const [year, periodNum] = e.target.value.split('-');
+                                    setPeriod({
+                                        year: parseInt(year),
+                                        period: parseInt(periodNum)
+                                    });
+                                }}
+                                className="period-select"
+                                disabled={loading}
+                            >
+                                {availablePeriods.map(p => (
+                                    <option key={p.value} value={p.value}>
+                                        {p.label}
                                     </option>
-                                );
-                            })}
-                        </select>
-                    </div>
-                    <div className="period-group">
-                        <label htmlFor="period" className="period-label">Dönem</label>
-                        <select
-                            id="period"
-                            value={period.period}
-                            onChange={(e) => handlePeriodChange('period', e.target.value)}
-                            className="period-select"
-                            disabled={loading}
-                        >
-                            <option value={1}>1. Dönem</option>
-                            <option value={2}>2. Dönem</option>
-                            <option value={3}>3. Dönem</option>
-                            <option value={4}>4. Dönem</option>
-                        </select>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="period-info">
+                            <span className="current-period-indicator">
+                                {period.year === new Date().getFullYear() && 
+                                 period.period === periodService.getCurrentPeriod().period ? 
+                                 '● Mevcut Dönem' : '○ Geçmiş/Gelecek Dönem'}
+                            </span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
             {/* Veri Giriş Tablosu */}
             <div className="data-table-container">
@@ -293,10 +298,15 @@ const DataEntryPage = () => {
                                             </td>
                                             <td>
                                                 <div className="historical-data">
-                                                    {indicator.historicalData[0] ? (
-                                                        <span className="historical-value">
-                                                            {formatValue(indicator.historicalData[0].value, indicator.dataType)}
-                                                        </span>
+                                                    {indicator.historicalData && indicator.historicalData.length > 0 ? (
+                                                        <div className="historical-item">
+                                                            <span className="historical-value">
+                                                                {formatValue(indicator.historicalData[0].value, indicator.dataType)}
+                                                            </span>
+                                                            <small className="historical-period">
+                                                                {indicator.historicalData[0].periodLabel}
+                                                            </small>
+                                                        </div>
                                                     ) : (
                                                         <span className="no-data">-</span>
                                                     )}
@@ -304,10 +314,15 @@ const DataEntryPage = () => {
                                             </td>
                                             <td>
                                                 <div className="historical-data">
-                                                    {indicator.historicalData[1] ? (
-                                                        <span className="historical-value">
-                                                            {formatValue(indicator.historicalData[1].value, indicator.dataType)}
-                                                        </span>
+                                                    {indicator.historicalData && indicator.historicalData.length > 1 ? (
+                                                        <div className="historical-item">
+                                                            <span className="historical-value">
+                                                                {formatValue(indicator.historicalData[1].value, indicator.dataType)}
+                                                            </span>
+                                                            <small className="historical-period">
+                                                                {indicator.historicalData[1].periodLabel}
+                                                            </small>
+                                                        </div>
                                                     ) : (
                                                         <span className="no-data">-</span>
                                                     )}
@@ -347,50 +362,61 @@ const DataEntryPage = () => {
                 )}
             </div>
 
-            {/* Genel Açıklama */}
-            {indicators.length > 0 && (
-                <div className="general-notes-section">
-                    <h2 className="section-title">Genel Açıklama</h2>
-                    <textarea
-                        value={formData.generalNotes}
-                        onChange={(e) => handleGeneralNotesChange(e.target.value)}
-                        className="general-notes-textarea"
-                        placeholder="Bu dönem için genel açıklama yazın..."
-                        rows={4}
-                        disabled={loading}
-                    />
-                </div>
-            )}
+                {/* Genel Açıklama */}
+                {indicators.length > 0 && (
+                    <div className="general-notes">
+                        <div className="notes-group">
+                            <label className="notes-label">Genel Açıklama</label>
+                            <textarea
+                                value={formData.generalNotes}
+                                onChange={(e) => handleGeneralNotesChange(e.target.value)}
+                                className="general-notes-textarea"
+                                placeholder="Bu dönem için genel açıklama yazın..."
+                                disabled={loading}
+                            />
+                        </div>
+                    </div>
+                )}
 
-            {/* Form Butonları */}
-            {indicators.length > 0 && (
-                <div className="form-actions">
-                    <button
-                        type="button"
-                        onClick={() => navigate('/dashboard')}
-                        className="btn btn-secondary"
-                        disabled={loading}
-                    >
-                        İptal
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleSaveDraft}
-                        className="btn btn-draft"
-                        disabled={loading}
-                    >
-                        {loading ? 'Kaydediliyor...' : 'Taslak Olarak Kaydet'}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleSubmitForm}
-                        className="btn btn-primary"
-                        disabled={loading}
-                    >
-                        {loading ? 'Gönderiliyor...' : 'Kaydet ve Gönder'}
-                    </button>
-                </div>
-            )}
+                {/* Form Butonları */}
+                {indicators.length > 0 && (
+                    <div className="form-actions">
+                        <button
+                            type="button"
+                            onClick={() => navigate('/dashboard')}
+                            className="btn btn-secondary"
+                            disabled={loading}
+                        >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            İptal
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSaveDraft}
+                            className="btn btn-secondary"
+                            disabled={loading}
+                        >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            {loading ? 'Kaydediliyor...' : 'Taslak Kaydet'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSubmitForm}
+                            className="btn btn-primary"
+                            disabled={loading}
+                        >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            {loading ? 'Gönderiliyor...' : 'Kaydet ve Gönder'}
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
