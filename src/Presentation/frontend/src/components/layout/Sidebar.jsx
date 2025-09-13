@@ -13,6 +13,12 @@ const Sidebar = () => {
       description: 'Ana sayfa'
     },
     { 
+      path: '/charts', 
+      label: 'Grafikler', 
+      icon: '📈',
+      description: 'Grafik yönetimi ve görüntüleme'
+    },
+    { 
       path: '/indicators', 
       label: 'Gösterge Listesi', 
       icon: '📊',

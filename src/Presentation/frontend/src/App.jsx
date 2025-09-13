@@ -10,6 +10,7 @@ import IndicatorListPage from './pages/indicators/IndicatorListPage';
 import NewIndicatorPage from './pages/indicators/NewIndicatorPage';
 import EditIndicatorPage from './pages/indicators/EditIndicatorPage';
 import DataEntryPage from './pages/indicators/DataEntryPage';
+import ChartsPage from './pages/charts/ChartsPage';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
 // CSS imports
@@ -17,9 +18,11 @@ import './styles/globals.css';
 import './styles/components/layout.css';
 import './styles/components/auth.css';
 import './styles/components/dashboard.css';
+import './styles/components/chart-modals.css';
 import './styles/pages/indicator-list.css';
 import './styles/pages/indicator-form.css';
 import './styles/pages/data-entry.css';
+import './styles/pages/charts.css';
 
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -111,6 +114,16 @@ function AppRoutes() {
           element={
             <PrivateRoute>
               <DataEntryPage />
+            </PrivateRoute>
+          } 
+        />
+        
+        {/* Chart Routes */}
+        <Route 
+          path="/charts" 
+          element={
+            <PrivateRoute>
+              <ChartsPage />
             </PrivateRoute>
           } 
         />

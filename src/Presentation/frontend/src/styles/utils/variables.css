@@ -1,5 +1,6 @@
 :root {
   /* Premium Color Palette */
+  --primary-25: #f0f8ff;
   --primary-50: #eff6ff;
   --primary-100: #dbeafe;
   --primary-200: #bfdbfe;
@@ -11,6 +12,7 @@
   --primary-800: #1e40af;
   --primary-900: #1e3a8a;
 
+  --secondary-25: #fafbfc;
   --secondary-50: #f8fafc;
   --secondary-100: #f1f5f9;
   --secondary-200: #e2e8f0;

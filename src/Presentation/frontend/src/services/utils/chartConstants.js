@@ -1,0 +1,68 @@
+// Chart Types
+export const ChartType = {
+    PieChart: 1,
+    ColumnChart: 2,
+    ComboChart: 3,
+    DifferenceChart: 4,
+    DataTable: 5
+};
+
+// Historical Data Display Types
+export const HistoricalDataDisplayType = {
+    Table: 1,
+    ComboChart: 2,
+    DifferenceChart: 3
+};
+
+// Filter Types
+export const FilterType = {
+    Single: 1,
+    Multiple: 2
+};
+
+// Chart constants
+export const CHART_COLORS = [
+    '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+    '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1'
+];
+
+export const getChartTypeText = (type) => {
+    switch (type) {
+        case ChartType.PieChart:
+            return 'Pasta Grafiği';
+        case ChartType.ColumnChart:
+            return 'Sütun Grafiği';
+        case ChartType.ComboChart:
+            return 'Kombine Grafik';
+        case ChartType.DifferenceChart:
+            return 'Fark Grafiği';
+        case ChartType.DataTable:
+            return 'Veri Tablosu';
+        default:
+            return 'Bilinmeyen';
+    }
+};
+
+export const getHistoricalDataDisplayTypeText = (type) => {
+    switch (type) {
+        case HistoricalDataDisplayType.Table:
+            return 'Tablo';
+        case HistoricalDataDisplayType.ComboChart:
+            return 'Kombine Grafik';
+        case HistoricalDataDisplayType.DifferenceChart:
+            return 'Fark Grafiği';
+        default:
+            return 'Bilinmeyen';
+    }
+};
+
+export const getFilterTypeText = (type) => {
+    switch (type) {
+        case FilterType.Single:
+            return 'Tekli Seçim';
+        case FilterType.Multiple:
+            return 'Çoklu Seçim';
+        default:
+            return 'Bilinmeyen';
+    }
+};

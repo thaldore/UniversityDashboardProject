@@ -21,6 +21,15 @@ namespace UniversityDashBoardProject.Infrastructure.Persistence
         public DbSet<IndicatorData> IndicatorData { get; set; }
         public DbSet<IndicatorHistoricalData> IndicatorHistoricalData { get; set; }
 
+        // Chart related DbSets
+        public DbSet<Chart> Charts { get; set; }
+        public DbSet<ChartSection> ChartSections { get; set; }
+        public DbSet<ChartIndicator> ChartIndicators { get; set; }
+        public DbSet<ChartFilter> ChartFilters { get; set; }
+        public DbSet<ChartGroup> ChartGroups { get; set; }
+        public DbSet<ChartFilterIndicator> ChartFilterIndicators { get; set; }
+        public DbSet<ChartGroupIndicator> ChartGroupIndicators { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -160,6 +169,148 @@ namespace UniversityDashBoardProject.Infrastructure.Persistence
                     
                 entity.Property(ihd => ihd.Value)
                     .HasPrecision(20, 4);
+            });
+
+            // Chart configuration
+            builder.Entity<Chart>(entity =>
+            {
+                entity.HasKey(c => c.ChartId);
+                
+                entity.Property(c => c.ChartName)
+                    .HasMaxLength(200)
+                    .IsRequired();
+                    
+                entity.Property(c => c.Title)
+                    .HasMaxLength(200)
+                    .IsRequired();
+                    
+                entity.Property(c => c.Subtitle)
+                    .HasMaxLength(200);
+                    
+                entity.Property(c => c.ChartType)
+                    .HasConversion<string>();
+                    
+                entity.Property(c => c.HistoricalDataDisplayType)
+                    .HasConversion<string>();
+                
+                entity.HasOne(c => c.Section)
+                    .WithMany(s => s.Charts)
+                    .HasForeignKey(c => c.SectionId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                    
+                entity.HasOne(c => c.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(c => c.CreatedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ChartSection configuration
+            builder.Entity<ChartSection>(entity =>
+            {
+                entity.HasKey(cs => cs.SectionId);
+                
+                entity.Property(cs => cs.SectionName)
+                    .HasMaxLength(200)
+                    .IsRequired();
+                
+                entity.HasOne(cs => cs.Parent)
+                    .WithMany(cs => cs.Children)
+                    .HasForeignKey(cs => cs.ParentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ChartIndicator configuration
+            builder.Entity<ChartIndicator>(entity =>
+            {
+                entity.HasKey(ci => new { ci.ChartId, ci.IndicatorId });
+                
+                entity.Property(ci => ci.Color)
+                    .HasMaxLength(7);
+                    
+                entity.Property(ci => ci.Label)
+                    .HasMaxLength(200);
+                
+                entity.HasOne(ci => ci.Chart)
+                    .WithMany(c => c.ChartIndicators)
+                    .HasForeignKey(ci => ci.ChartId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(ci => ci.Indicator)
+                    .WithMany()
+                    .HasForeignKey(ci => ci.IndicatorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ChartFilter configuration
+            builder.Entity<ChartFilter>(entity =>
+            {
+                entity.HasKey(cf => cf.FilterId);
+                
+                entity.Property(cf => cf.FilterName)
+                    .HasMaxLength(100)
+                    .IsRequired();
+                    
+                entity.Property(cf => cf.FilterType)
+                    .HasConversion<string>();
+                    
+                entity.Property(cf => cf.FilterValue)
+                    .HasMaxLength(100)
+                    .IsRequired();
+                
+                entity.HasOne(cf => cf.Chart)
+                    .WithMany(c => c.ChartFilters)
+                    .HasForeignKey(cf => cf.ChartId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ChartGroup configuration
+            builder.Entity<ChartGroup>(entity =>
+            {
+                entity.HasKey(cg => cg.GroupId);
+                
+                entity.Property(cg => cg.GroupName)
+                    .HasMaxLength(100)
+                    .IsRequired();
+                    
+                entity.Property(cg => cg.Color)
+                    .HasMaxLength(7);
+                
+                entity.HasOne(cg => cg.Chart)
+                    .WithMany(c => c.ChartGroups)
+                    .HasForeignKey(cg => cg.ChartId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // ChartFilterIndicator configuration
+            builder.Entity<ChartFilterIndicator>(entity =>
+            {
+                entity.HasKey(cfi => new { cfi.FilterId, cfi.IndicatorId });
+                
+                entity.HasOne(cfi => cfi.Filter)
+                    .WithMany(cf => cf.ChartFilterIndicators)
+                    .HasForeignKey(cfi => cfi.FilterId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(cfi => cfi.Indicator)
+                    .WithMany()
+                    .HasForeignKey(cfi => cfi.IndicatorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // ChartGroupIndicator configuration
+            builder.Entity<ChartGroupIndicator>(entity =>
+            {
+                entity.HasKey(cgi => new { cgi.GroupId, cgi.IndicatorId });
+                
+                entity.HasOne(cgi => cgi.Group)
+                    .WithMany(cg => cg.ChartGroupIndicators)
+                    .HasForeignKey(cgi => cgi.GroupId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(cgi => cgi.Indicator)
+                    .WithMany()
+                    .HasForeignKey(cgi => cgi.IndicatorId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
         }
     }

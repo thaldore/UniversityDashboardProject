@@ -123,6 +123,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IIndicatorService, IndicatorService>();
+builder.Services.AddScoped<IChartService, ChartService>();
 builder.Services.AddScoped<UniversityDashBoardProject.Domain.Services.IPeriodCalculationService, UniversityDashBoardProject.Infrastructure.Services.PeriodCalculationService>();
 
 // MediatR - handlers live in Application project
