@@ -4,7 +4,8 @@ export const ChartType = {
     ColumnChart: 2,
     ComboChart: 3,
     DifferenceChart: 4,
-    DataTable: 5
+    DataTable: 5,
+    Column3D: 6
 };
 
 // Historical Data Display Types
@@ -38,6 +39,8 @@ export const getChartTypeText = (type) => {
             return 'Fark Grafiği';
         case ChartType.DataTable:
             return 'Veri Tablosu';
+        case ChartType.Column3D:
+            return '3D Sütun Grafiği';
         default:
             return 'Bilinmeyen';
     }

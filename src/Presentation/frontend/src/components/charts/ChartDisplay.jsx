@@ -4,6 +4,7 @@ import periodService from '../../services/periodService';
 import { ChartType, CHART_COLORS } from '../../services/utils/chartConstants';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
+import Chart3D from './Chart3D';
 
 // Register Chart.js components
 ChartJS.register(
@@ -171,8 +172,8 @@ const ChartDisplay = ({ chart }) => {
         
         // Add historical periods in reverse order (oldest first)
         if (data.historicalData && data.historicalData.length > 0) {
-            // Sort by period in descending order, then reverse to get oldest first
-            const sortedHistorical = [...data.historicalData].sort((a, b) => (b.period || 0) - (a.period || 0));
+            // Sort by period in ascending order (oldest first: Geçmiş Dönem 2, Geçmiş Dönem 1)
+            const sortedHistorical = [...data.historicalData].sort((a, b) => (a.period || 0) - (b.period || 0));
             sortedHistorical.forEach(period => {
                 periodLabels.push(period.periodLabel || `Geçmiş ${period.period || 'Dönem'}`);
             });
@@ -187,8 +188,11 @@ const ChartDisplay = ({ chart }) => {
         const indicators = [];
         if (data.currentData && data.currentData.length > 0) {
             data.currentData.forEach(item => {
+                // Clean the label - remove period suffix for legend
+                const cleanLabel = item.label.replace(/\s*-\s*Güncel Dönem\s*$/, '').trim();
                 indicators.push({
-                    label: item.label,
+                    label: cleanLabel, // Use clean label for legend
+                    originalLabel: item.label, // Keep original for data matching
                     color: CHART_COLORS[indicators.length % CHART_COLORS.length]
                 });
             });
@@ -202,35 +206,34 @@ const ChartDisplay = ({ chart }) => {
             
             // Collect data for this indicator across all periods
             if (data.historicalData && data.historicalData.length > 0) {
-                const sortedHistorical = [...data.historicalData].sort((a, b) => (b.period || 0) - (a.period || 0));
+                const sortedHistorical = [...data.historicalData].sort((a, b) => (a.period || 0) - (b.period || 0));
                 sortedHistorical.forEach(period => {
-                    console.log(`Searching in ${period.periodLabel} for indicator:`, indicator.label);
+                    console.log(`Searching in ${period.periodLabel} for indicator:`, indicator.originalLabel);
                     console.log(`Available data in this period:`, period.data);
-                    const item = period.data.find(d => d.label === indicator.label);
+                    let item = period.data.find(d => d.label === indicator.originalLabel);
                     if (!item) {
                         // Try to find by partial match (remove period suffix)
-                        const baseLabel = indicator.label.replace(/\s*-\s*Güncel Dönem\s*$/, '').trim();
-                        const alternativeItem = period.data.find(d => 
+                        const baseLabel = indicator.originalLabel.replace(/\s*-\s*Güncel Dönem\s*$/, '').trim();
+                        item = period.data.find(d => 
                             d.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim() === baseLabel
                         );
-                        console.log(`Base label search: "${baseLabel}" -> found:`, alternativeItem);
-                        indicatorData.push(alternativeItem ? alternativeItem.value : 0);
-                    } else {
-                        indicatorData.push(item.value);
+                        console.log(`Base label search: "${baseLabel}" -> found:`, item);
                     }
-                    console.log(`Historical period ${period.periodLabel}: ${indicator.label} = ${item ? item.value : 0}`);
+                    const value = item ? item.value : 0;
+                    indicatorData.push(value);
+                    console.log(`Historical period ${period.periodLabel}: ${indicator.originalLabel} = ${value}`);
                 });
             }
             
             // Add current period data
-            const currentItem = data.currentData.find(d => d.label === indicator.label);
+            const currentItem = data.currentData.find(d => d.label === indicator.originalLabel);
             indicatorData.push(currentItem ? currentItem.value : 0);
-            console.log(`Current period: ${indicator.label} = ${currentItem ? currentItem.value : 0}`);
+            console.log(`Current period: ${indicator.originalLabel} = ${currentItem ? currentItem.value : 0}`);
 
             console.log(`Dataset for ${indicator.label}:`, indicatorData);
 
             return {
-                label: indicator.label, // Use indicator name as legend
+                label: indicator.label, // Use clean label for legend
                 data: indicatorData,
                 backgroundColor: indicator.color,
                 borderColor: indicator.color,
@@ -408,6 +411,13 @@ const ChartDisplay = ({ chart }) => {
                         <Line data={data} options={options} height={300} />
                     </div>
                 );
+            case ChartType.Column3D:
+                return (
+                    <div className="chart-container">
+                        {historicalNote}
+                        <Chart3D data={data} options={options} />
+                    </div>
+                );
             case ChartType.DataTable:
                 return renderDataTable();
             default:
@@ -563,9 +573,11 @@ const ChartDisplay = ({ chart }) => {
                             <thead>
                                 <tr>
                                     <th>Dönem</th>
-                                    {allPeriodsData[0]?.data?.map((item, index) => (
-                                        <th key={index}>{item.label}</th>
-                                    ))}
+                                    {allPeriodsData[0]?.data?.map((item, index) => {
+                                        // Clean the label - remove period suffix for table header
+                                        const cleanLabel = item.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim();
+                                        return <th key={index}>{cleanLabel}</th>;
+                                    })}
                                 </tr>
                             </thead>
                             <tbody>

@@ -18,6 +18,7 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
         description: '',
         sectionId: sectionId || null,
         displayOrder: 1,
+        isActive: true,
         showHistoricalData: false,
         historicalDataDisplayType: null,
         showHistoricalInChart: false,
@@ -81,6 +82,7 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                 description: sourceChart.description || sourceChart.Description || '',
                 sectionId: sourceChart.sectionId || sourceChart.SectionId || sectionId,
                 displayOrder: sourceChart.displayOrder || sourceChart.DisplayOrder || 1,
+                isActive: sourceChart.isActive !== undefined ? sourceChart.isActive : true,
                 showHistoricalData: sourceChart.showHistoricalData || sourceChart.ShowHistoricalData || false,
                 historicalDataDisplayType: sourceChart.historicalDataDisplayType || sourceChart.HistoricalDataDisplayType || null,
                 showHistoricalInChart: sourceChart.showHistoricalInChart || sourceChart.ShowHistoricalInChart || false,
@@ -143,6 +145,7 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                 description: '',
                 sectionId: sectionId || null,
                 displayOrder: 1,
+                isActive: true,
                 showHistoricalData: false,
                 historicalDataDisplayType: null,
                 showHistoricalInChart: false,
@@ -322,6 +325,7 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                 description: formData.description || null,
                 sectionId: parseInt(formData.sectionId),
                 displayOrder: parseInt(formData.displayOrder),
+                isActive: formData.isActive,
                 showHistoricalData: formData.showHistoricalData,
                 historicalDataDisplayType: formData.showHistoricalData ? 
                     parseInt(formData.historicalDataDisplayType) : null,
@@ -432,6 +436,7 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                                         <option value={ChartType.ComboChart}>Kombine Grafik</option>
                                         <option value={ChartType.DifferenceChart}>Fark Grafiği</option>
                                         <option value={ChartType.DataTable}>Veri Tablosu</option>
+                                        <option value={ChartType.Column3D}>3D Sütun Grafiği</option>
                                     </select>
                                 </div>
 
