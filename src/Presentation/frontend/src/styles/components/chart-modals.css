@@ -646,6 +646,38 @@
     color: var(--primary-800);
 }
 
+/* Historical Data Info Box */
+.historical-info-box {
+    display: flex;
+    gap: 0.75rem;
+    background: var(--primary-25);
+    border: 1px solid var(--primary-200);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.info-icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.info-text {
+    font-size: 0.875rem;
+    color: var(--primary-800);
+    line-height: 1.5;
+}
+
+.info-text strong {
+    color: var(--primary-900);
+}
+
+.info-text em {
+    color: var(--primary-700);
+    font-style: italic;
+    margin-left: 1rem;
+}
+
 @media (max-width: 768px) {
     .chart-manager-modal {
         max-width: 95vw;
@@ -687,5 +719,14 @@
     .add-button {
         align-self: flex-end;
         width: fit-content;
+    }
+    
+    .historical-info-box {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .info-icon {
+        align-self: flex-start;
     }
 }

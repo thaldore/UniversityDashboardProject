@@ -174,6 +174,8 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
                 DisplayOrder = request.DisplayOrder,
                 ShowHistoricalData = request.ShowHistoricalData,
                 HistoricalDataDisplayType = request.HistoricalDataDisplayType,
+                ShowHistoricalInChart = request.ShowHistoricalInChart,
+                HistoricalPeriodCount = request.HistoricalPeriodCount,
                 CreatedBy = userId,
                 Indicators = request.Indicators,
                 Filters = request.Filters,
@@ -203,6 +205,8 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
                 IsActive = request.IsActive,
                 ShowHistoricalData = request.ShowHistoricalData,
                 HistoricalDataDisplayType = request.HistoricalDataDisplayType,
+                ShowHistoricalInChart = request.ShowHistoricalInChart,
+                HistoricalPeriodCount = request.HistoricalPeriodCount,
                 Indicators = request.Indicators,
                 Filters = request.Filters,
                 Groups = request.Groups

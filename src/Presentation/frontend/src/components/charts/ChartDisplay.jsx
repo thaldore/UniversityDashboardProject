@@ -79,6 +79,7 @@ const ChartDisplay = ({ chart }) => {
 
             console.log('Loading chart data for chartId:', chartId);
             console.log('Chart showHistoricalData:', chartDetails.showHistoricalData);
+            console.log('Chart showHistoricalInChart:', chartDetails.showHistoricalInChart);
             console.log('Selected filter for request:', selectedFilter, 'Type:', typeof selectedFilter);
 
             const response = await chartService.getChartData(
@@ -89,10 +90,10 @@ const ChartDisplay = ({ chart }) => {
                 true  // Her zaman tarihsel veri dahil et
             );
 
-            console.log('Chart data response:', response.data);
-            console.log('Selected filter for request:', selectedFilter);
+            console.log('Chart data response FULL:', response.data);
+            console.log('Current data:', response.data.currentData);
+            console.log('Historical data from response:', response.data.historicalData);
             console.log('Chart indicators:', chartDetails.indicators?.map(i => ({ id: i.indicatorId, name: i.indicatorName })));
-            console.log('Response current data count:', response.data.currentData?.length);
             
             setChartData(response.data);
             
@@ -127,6 +128,16 @@ const ChartDisplay = ({ chart }) => {
             return formatGroupedChartData(data);
         }
 
+        // Check if chart should show historical data in the same chart
+        if (chartDetails.showHistoricalInChart && historicalData && historicalData.length > 0) {
+            console.log('HISTORICAL CHART MODE - historicalData:', historicalData);
+            console.log('HISTORICAL CHART MODE - currentData:', data.currentData);
+            return formatHistoricalChartData({
+                currentData: data.currentData,
+                historicalData: historicalData
+            });
+        }
+
         // Backend'den gelen veri zaten filtrelenmiş durumda, ek filtreleme yapmıyoruz
         const labels = data.currentData.map(item => item.label);
         const values = data.currentData.map(item => item.value);
@@ -146,6 +157,96 @@ const ChartDisplay = ({ chart }) => {
                 tension: 0.1
             }]
         };
+    };
+
+    const formatHistoricalChartData = (data) => {
+        console.log('formatHistoricalChartData called with:', {
+            currentData: data.currentData,
+            historicalData: data.historicalData,
+            showHistoricalInChart: chartDetails.showHistoricalInChart
+        });
+
+        // Create labels for periods (X-axis: Geçmiş Dönem 2, Geçmiş Dönem 1, Güncel Dönem)
+        const periodLabels = [];
+        
+        // Add historical periods in reverse order (oldest first)
+        if (data.historicalData && data.historicalData.length > 0) {
+            // Sort by period in descending order, then reverse to get oldest first
+            const sortedHistorical = [...data.historicalData].sort((a, b) => (b.period || 0) - (a.period || 0));
+            sortedHistorical.forEach(period => {
+                periodLabels.push(period.periodLabel || `Geçmiş ${period.period || 'Dönem'}`);
+            });
+        }
+        
+        // Add current period
+        periodLabels.push('Güncel Dönem');
+
+        console.log('Period labels (X-axis):', periodLabels);
+
+        // Extract indicators from current data
+        const indicators = [];
+        if (data.currentData && data.currentData.length > 0) {
+            data.currentData.forEach(item => {
+                indicators.push({
+                    label: item.label,
+                    color: CHART_COLORS[indicators.length % CHART_COLORS.length]
+                });
+            });
+        }
+
+        console.log('Indicators found:', indicators);
+
+        // Create datasets for each indicator (not periods)
+        const datasets = indicators.map((indicator) => {
+            const indicatorData = [];
+            
+            // Collect data for this indicator across all periods
+            if (data.historicalData && data.historicalData.length > 0) {
+                const sortedHistorical = [...data.historicalData].sort((a, b) => (b.period || 0) - (a.period || 0));
+                sortedHistorical.forEach(period => {
+                    console.log(`Searching in ${period.periodLabel} for indicator:`, indicator.label);
+                    console.log(`Available data in this period:`, period.data);
+                    const item = period.data.find(d => d.label === indicator.label);
+                    if (!item) {
+                        // Try to find by partial match (remove period suffix)
+                        const baseLabel = indicator.label.replace(/\s*-\s*Güncel Dönem\s*$/, '').trim();
+                        const alternativeItem = period.data.find(d => 
+                            d.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim() === baseLabel
+                        );
+                        console.log(`Base label search: "${baseLabel}" -> found:`, alternativeItem);
+                        indicatorData.push(alternativeItem ? alternativeItem.value : 0);
+                    } else {
+                        indicatorData.push(item.value);
+                    }
+                    console.log(`Historical period ${period.periodLabel}: ${indicator.label} = ${item ? item.value : 0}`);
+                });
+            }
+            
+            // Add current period data
+            const currentItem = data.currentData.find(d => d.label === indicator.label);
+            indicatorData.push(currentItem ? currentItem.value : 0);
+            console.log(`Current period: ${indicator.label} = ${currentItem ? currentItem.value : 0}`);
+
+            console.log(`Dataset for ${indicator.label}:`, indicatorData);
+
+            return {
+                label: indicator.label, // Use indicator name as legend
+                data: indicatorData,
+                backgroundColor: indicator.color,
+                borderColor: indicator.color,
+                borderWidth: 1,
+                tension: 0.1
+            };
+        });
+
+        const result = {
+            labels: periodLabels,
+            datasets: datasets
+        };
+
+        console.log('Historical chart data formatted FINAL:', result);
+
+        return result;
     };
 
     const formatGroupedChartData = (data) => {
@@ -205,6 +306,12 @@ const ChartDisplay = ({ chart }) => {
             plugins: {
                 legend: {
                     position: 'top',
+                    display: true,
+                    // Show legend when there are multiple datasets (historical data)
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20
+                    }
                 },
                 title: {
                     display: false
@@ -213,7 +320,14 @@ const ChartDisplay = ({ chart }) => {
                     callbacks: {
                         label: (context) => {
                             const value = context.parsed.y || context.parsed;
+                            const datasetLabel = context.dataset.label || '';
                             const indicatorName = chartData?.indicatorNames?.[context.dataIndex] || context.label;
+                            
+                            // If historical data is shown in chart, include period info
+                            if (chartDetails.showHistoricalInChart && datasetLabel) {
+                                return `${datasetLabel} - ${indicatorName}: ${value}`;
+                            }
+                            
                             return `${indicatorName}: ${value}`;
                         }
                     }
@@ -269,22 +383,28 @@ const ChartDisplay = ({ chart }) => {
 
         const options = getChartOptions();
 
+        // Add note if historical data is shown in chart - REMOVED
+        const historicalNote = null;
+
         switch (chart.chartType) {
             case ChartType.PieChart:
                 return (
                     <div className="chart-container">
+                        {historicalNote}
                         <Pie data={data} options={options} height={300} />
                     </div>
                 );
             case ChartType.ColumnChart:
                 return (
                     <div className="chart-container">
+                        {historicalNote}
                         <Bar data={data} options={options} height={300} />
                     </div>
                 );
             case ChartType.ComboChart:
                 return (
                     <div className="chart-container">
+                        {historicalNote}
                         <Line data={data} options={options} height={300} />
                     </div>
                 );
@@ -293,6 +413,7 @@ const ChartDisplay = ({ chart }) => {
             default:
                 return (
                     <div className="chart-container">
+                        {historicalNote}
                         <Bar data={data} options={options} height={300} />
                     </div>
                 );
@@ -397,10 +518,15 @@ const ChartDisplay = ({ chart }) => {
     const renderHistoricalData = () => {
         console.log('renderHistoricalData called:', {
             historicalData,
-            hasData: historicalData && historicalData.length > 0
+            hasData: historicalData && historicalData.length > 0,
+            showHistoricalInChart: chartDetails.showHistoricalInChart,
+            showHistoricalData: chartDetails.showHistoricalData
         });
         
         if (!historicalData || historicalData.length === 0) return null;
+
+        // Show historical data table regardless of showHistoricalInChart setting
+        // If showHistoricalInChart is true, data is also in chart, but table provides additional detail
 
         // Güncel veri ile geçmiş verileri birleştir
         const allPeriodsData = [];
@@ -422,9 +548,13 @@ const ChartDisplay = ({ chart }) => {
             });
         });
 
+        const tableTitle = chartDetails.showHistoricalInChart 
+            ? "📊 Dönem Verilerinin Detay Tablosu"
+            : "📊 Dönem Verilerinin Karşılaştırması";
+
         return (
             <div className="historical-data-section">
-                <h4>📊 Dönem Verilerinin Karşılaştırması</h4>
+                <h4>{tableTitle}</h4>
                 
                 {/* Chart 2 için özel: her zaman tablo görünümü kullan */}
                 {(chartDetails.chartId === 2 || chartDetails.historicalDataDisplayType === 1 || !chartDetails.historicalDataDisplayType) ? ( // Table or default or Chart 2

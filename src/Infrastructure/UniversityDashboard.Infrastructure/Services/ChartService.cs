@@ -165,8 +165,12 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 Title = chart.Title,
                 Subtitle = chart.Subtitle,
                 Description = chart.Description,
+                SectionId = chart.SectionId,
+                DisplayOrder = chart.DisplayOrder,
                 ShowHistoricalData = chart.ShowHistoricalData,
                 HistoricalDataDisplayType = chart.HistoricalDataDisplayType,
+                ShowHistoricalInChart = chart.ShowHistoricalInChart,
+                HistoricalPeriodCount = chart.HistoricalPeriodCount,
                 Indicators = chart.ChartIndicators
                     .OrderBy(ci => ci.DisplayOrder)
                     .Select(ci => new ChartIndicatorDto
@@ -231,6 +235,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     DisplayOrder = request.DisplayOrder,
                     ShowHistoricalData = request.ShowHistoricalData,
                     HistoricalDataDisplayType = request.HistoricalDataDisplayType,
+                    ShowHistoricalInChart = request.ShowHistoricalInChart,
+                    HistoricalPeriodCount = request.HistoricalPeriodCount,
                     CreatedBy = createdBy,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow,
@@ -346,6 +352,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 chart.IsActive = request.IsActive;
                 chart.ShowHistoricalData = request.ShowHistoricalData;
                 chart.HistoricalDataDisplayType = request.HistoricalDataDisplayType;
+                chart.ShowHistoricalInChart = request.ShowHistoricalInChart;
+                chart.HistoricalPeriodCount = request.HistoricalPeriodCount;
                 chart.UpdatedAt = DateTime.UtcNow;
 
                 // Remove existing relations
@@ -357,8 +365,74 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
                 await _context.SaveChangesAsync();
 
-                // Add new relations (same logic as CreateChartAsync)
-                // ... (Implementation continues similar to CreateChartAsync)
+                // Add new indicators
+                foreach (var indicator in request.Indicators)
+                {
+                    var chartIndicator = new ChartIndicator
+                    {
+                        ChartId = chart.ChartId,
+                        IndicatorId = indicator.IndicatorId,
+                        DisplayOrder = indicator.DisplayOrder,
+                        Color = indicator.Color,
+                        Label = indicator.Label,
+                        IsVisible = indicator.IsVisible
+                    };
+                    _context.ChartIndicators.Add(chartIndicator);
+                }
+
+                // Add new filters
+                foreach (var filter in request.Filters)
+                {
+                    var chartFilter = new ChartFilter
+                    {
+                        ChartId = chart.ChartId,
+                        FilterName = filter.FilterName,
+                        FilterType = filter.FilterType,
+                        FilterValue = filter.FilterValue,
+                        IsDefault = filter.IsDefault,
+                        DisplayOrder = filter.DisplayOrder
+                    };
+                    _context.ChartFilters.Add(chartFilter);
+                    await _context.SaveChangesAsync();
+
+                    // Add filter indicators
+                    foreach (var indicatorId in filter.IndicatorIds)
+                    {
+                        var filterIndicator = new ChartFilterIndicator
+                        {
+                            FilterId = chartFilter.FilterId,
+                            IndicatorId = indicatorId
+                        };
+                        _context.ChartFilterIndicators.Add(filterIndicator);
+                    }
+                }
+
+                // Add new groups
+                foreach (var group in request.Groups)
+                {
+                    var chartGroup = new ChartGroup
+                    {
+                        ChartId = chart.ChartId,
+                        GroupName = group.GroupName,
+                        Description = group.Description,
+                        DisplayOrder = group.DisplayOrder,
+                        Color = group.Color
+                    };
+                    _context.ChartGroups.Add(chartGroup);
+                    await _context.SaveChangesAsync();
+
+                    // Add group indicators
+                    foreach (var indicatorId in group.IndicatorIds)
+                    {
+                        var groupIndicator = new ChartGroupIndicator
+                        {
+                            GroupId = chartGroup.GroupId,
+                            IndicatorId = indicatorId,
+                            DisplayOrder = group.IndicatorIds.IndexOf(indicatorId)
+                        };
+                        _context.ChartGroupIndicators.Add(groupIndicator);
+                    }
+                }
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -374,13 +448,50 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
         public async Task<bool> DeleteChartAsync(int chartId)
         {
-            var chart = await _context.Charts.FindAsync(chartId);
-            if (chart == null) return false;
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var chart = await _context.Charts
+                    .Include(c => c.ChartIndicators)
+                    .Include(c => c.ChartFilters)
+                        .ThenInclude(cf => cf.ChartFilterIndicators)
+                    .Include(c => c.ChartGroups)
+                        .ThenInclude(cg => cg.ChartGroupIndicators)
+                    .FirstOrDefaultAsync(c => c.ChartId == chartId);
 
-            chart.IsActive = false;
-            await _context.SaveChangesAsync();
+                if (chart == null) return false;
 
-            return true;
+                // İlk olarak ilişkili tabloları sil
+                // Chart Filter Indicators
+                var filterIndicators = chart.ChartFilters.SelectMany(cf => cf.ChartFilterIndicators);
+                _context.ChartFilterIndicators.RemoveRange(filterIndicators);
+
+                // Chart Group Indicators
+                var groupIndicators = chart.ChartGroups.SelectMany(cg => cg.ChartGroupIndicators);
+                _context.ChartGroupIndicators.RemoveRange(groupIndicators);
+
+                // Chart Indicators
+                _context.ChartIndicators.RemoveRange(chart.ChartIndicators);
+
+                // Chart Filters
+                _context.ChartFilters.RemoveRange(chart.ChartFilters);
+
+                // Chart Groups
+                _context.ChartGroups.RemoveRange(chart.ChartGroups);
+
+                // Son olarak Chart'ı sil
+                _context.Charts.Remove(chart);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return true;
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         #endregion
@@ -427,37 +538,91 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             // Build current data
             foreach (var chartIndicator in indicatorsToShow.OrderBy(ci => ci.DisplayOrder))
             {
-                // Try to get latest data for the specified year and period first
-                var latestData = chartIndicator.Indicator.Data
-                    .Where(d => d.Year == request.Year && d.Period == request.Period && d.Status == DataStatus.Approved)
-                    .FirstOrDefault();
-
-                // If no data found for specific year/period, try to get the most recent approved data
-                if (latestData == null)
+                // ShowHistoricalInChart true ise geçmiş dönemleri de dahil et
+                if (chart.ShowHistoricalInChart && chart.HistoricalPeriodCount.HasValue)
                 {
-                    latestData = chartIndicator.Indicator.Data
+                    // Geçmiş dönemler dahil olmak üzere veri topla
+                    var historicalPeriodCount = chart.HistoricalPeriodCount.Value;
+                    
+                    // Son N dönemin verilerini getir
+                    var historicalData = chartIndicator.Indicator.Data
                         .Where(d => d.Status == DataStatus.Approved)
                         .OrderByDescending(d => d.Year)
                         .ThenByDescending(d => d.Period)
-                        .FirstOrDefault();
-                }
+                        .Take(historicalPeriodCount)
+                        .OrderBy(d => d.Year)
+                        .ThenBy(d => d.Period)
+                        .ToList();
 
-                if (latestData != null)
-                {
-                    response.CurrentData.Add(new ChartDataDto
+                    // Her dönem için ayrı data point oluştur
+                    for (int i = 0; i < historicalData.Count; i++)
                     {
-                        Label = chartIndicator.Label ?? chartIndicator.Indicator.IndicatorName,
-                        Value = latestData.Value ?? 0,
-                        Color = chartIndicator.Color,
-                        Unit = chartIndicator.Indicator.DataType.ToString(),
-                        AdditionalData = new Dictionary<string, object>
+                        var data = historicalData[i];
+                        string periodLabel;
+                        
+                        if (i == historicalData.Count - 1)
                         {
-                            { "IndicatorCode", chartIndicator.Indicator.IndicatorCode },
-                            { "IndicatorId", chartIndicator.IndicatorId },
-                            { "Year", latestData.Year },
-                            { "Period", latestData.Period }
+                            periodLabel = "Güncel Dönem";
                         }
-                    });
+                        else
+                        {
+                            var periodsBack = historicalData.Count - 1 - i;
+                            periodLabel = $"Geçmiş {periodsBack}. Dönem";
+                        }
+
+                        response.CurrentData.Add(new ChartDataDto
+                        {
+                            Label = $"{chartIndicator.Label ?? chartIndicator.Indicator.IndicatorName} - {periodLabel}",
+                            Value = data.Value ?? 0,
+                            Color = chartIndicator.Color,
+                            Unit = chartIndicator.Indicator.DataType.ToString(),
+                            AdditionalData = new Dictionary<string, object>
+                            {
+                                { "IndicatorCode", chartIndicator.Indicator.IndicatorCode },
+                                { "IndicatorId", chartIndicator.IndicatorId },
+                                { "Year", data.Year },
+                                { "Period", data.Period },
+                                { "PeriodLabel", periodLabel },
+                                { "IsHistorical", i < historicalData.Count - 1 }
+                            }
+                        });
+                    }
+                }
+                else
+                {
+                    // Sadece güncel dönem verisi
+                    // Try to get latest data for the specified year and period first
+                    var latestData = chartIndicator.Indicator.Data
+                        .Where(d => d.Year == request.Year && d.Period == request.Period && d.Status == DataStatus.Approved)
+                        .FirstOrDefault();
+
+                    // If no data found for specific year/period, try to get the most recent approved data
+                    if (latestData == null)
+                    {
+                        latestData = chartIndicator.Indicator.Data
+                            .Where(d => d.Status == DataStatus.Approved)
+                            .OrderByDescending(d => d.Year)
+                            .ThenByDescending(d => d.Period)
+                            .FirstOrDefault();
+                    }
+
+                    if (latestData != null)
+                    {
+                        response.CurrentData.Add(new ChartDataDto
+                        {
+                            Label = chartIndicator.Label ?? chartIndicator.Indicator.IndicatorName,
+                            Value = latestData.Value ?? 0,
+                            Color = chartIndicator.Color,
+                            Unit = chartIndicator.Indicator.DataType.ToString(),
+                            AdditionalData = new Dictionary<string, object>
+                            {
+                                { "IndicatorCode", chartIndicator.Indicator.IndicatorCode },
+                                { "IndicatorId", chartIndicator.IndicatorId },
+                                { "Year", latestData.Year },
+                                { "Period", latestData.Period }
+                            }
+                        });
+                    }
                 }
             }
 

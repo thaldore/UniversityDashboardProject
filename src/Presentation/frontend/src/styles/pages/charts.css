@@ -248,6 +248,57 @@
     color: var(--secondary-600);
 }
 
+/* Historical Chart Note */
+.historical-chart-note {
+    background: var(--primary-50);
+    border: 1px solid var(--primary-200);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    color: var(--primary-800);
+}
+
+.historical-chart-note p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* Historical Data Section */
+.historical-data-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: var(--secondary-25);
+    border-radius: 8px;
+    border: 1px solid var(--secondary-200);
+}
+
+.historical-data-section h4 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--secondary-800);
+    font-weight: 600;
+}
+
+/* Historical Chart Note */
+.historical-chart-note {
+    background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
+    border: 1px solid var(--primary-200);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.historical-chart-note p {
+    margin: 0;
+    color: var(--primary-700);
+    font-size: 0.9rem;
+}
+
+.historical-chart-note strong {
+    color: var(--primary-800);
+}
+
 .chart-loading .loading-spinner {
     width: 40px;
     height: 40px;
@@ -608,12 +659,53 @@
     background: var(--secondary-50);
     border-radius: 8px;
     border: 1px solid var(--secondary-200);
+    overflow-x: auto; /* Tablo taşmasını engelle */
+    max-width: 100%;
 }
 
 .historical-data-section h4 {
     color: var(--secondary-800);
     margin-bottom: 1rem;
     font-size: 1.1rem;
+}
+
+.historical-table {
+    width: 100%;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+
+.data-table {
+    width: 100%;
+    min-width: 500px; /* Minimum tablo genişliği */
+    border-collapse: collapse;
+    background: white;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--secondary-200);
+    white-space: nowrap; /* Metin kırılmasını engelle */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Uzun metinleri ... ile kısalt */
+    max-width: 200px; /* Maksimum sütun genişliği */
+}
+
+.data-table th {
+    background: var(--primary-50);
+    color: var(--primary-700);
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 
 .current-data-row {

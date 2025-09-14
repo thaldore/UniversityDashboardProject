@@ -13,6 +13,8 @@ namespace UniversityDashBoardProject.Application.DTOs.Chart
         public int DisplayOrder { get; set; }
         public bool ShowHistoricalData { get; set; }
         public HistoricalDataDisplayType? HistoricalDataDisplayType { get; set; }
+        public bool ShowHistoricalInChart { get; set; }
+        public int? HistoricalPeriodCount { get; set; }
         public List<CreateChartIndicatorRequest> Indicators { get; set; } = new();
         public List<CreateChartFilterRequest> Filters { get; set; } = new();
         public List<CreateChartGroupRequest> Groups { get; set; } = new();
@@ -29,6 +31,8 @@ namespace UniversityDashBoardProject.Application.DTOs.Chart
         public bool IsActive { get; set; }
         public bool ShowHistoricalData { get; set; }
         public HistoricalDataDisplayType? HistoricalDataDisplayType { get; set; }
+        public bool ShowHistoricalInChart { get; set; }
+        public int? HistoricalPeriodCount { get; set; }
         public List<CreateChartIndicatorRequest> Indicators { get; set; } = new();
         public List<CreateChartFilterRequest> Filters { get; set; } = new();
         public List<CreateChartGroupRequest> Groups { get; set; } = new();

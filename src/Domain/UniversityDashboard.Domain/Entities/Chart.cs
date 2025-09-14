@@ -15,6 +15,8 @@ namespace UniversityDashBoardProject.Domain.Entities
         public bool IsActive { get; set; } = true;
         public bool ShowHistoricalData { get; set; } = false;
         public HistoricalDataDisplayType? HistoricalDataDisplayType { get; set; }
+        public bool ShowHistoricalInChart { get; set; } = false;
+        public int? HistoricalPeriodCount { get; set; }
         public int CreatedBy { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

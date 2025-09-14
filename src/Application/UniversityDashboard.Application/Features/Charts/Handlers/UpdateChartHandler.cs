@@ -27,6 +27,8 @@ namespace UniversityDashBoardProject.Application.Features.Charts.Handlers
                 IsActive = request.IsActive,
                 ShowHistoricalData = request.ShowHistoricalData,
                 HistoricalDataDisplayType = request.HistoricalDataDisplayType,
+                ShowHistoricalInChart = request.ShowHistoricalInChart,
+                HistoricalPeriodCount = request.HistoricalPeriodCount,
                 Indicators = request.Indicators,
                 Filters = request.Filters,
                 Groups = request.Groups

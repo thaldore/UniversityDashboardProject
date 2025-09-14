@@ -14,6 +14,8 @@ namespace UniversityDashBoardProject.Application.Features.Charts.Commands
         public int DisplayOrder { get; set; }
         public bool ShowHistoricalData { get; set; }
         public Domain.Enums.HistoricalDataDisplayType? HistoricalDataDisplayType { get; set; }
+        public bool ShowHistoricalInChart { get; set; }
+        public int? HistoricalPeriodCount { get; set; }
         public int CreatedBy { get; set; }
         public List<CreateChartIndicatorRequest> Indicators { get; set; } = new();
         public List<CreateChartFilterRequest> Filters { get; set; } = new();

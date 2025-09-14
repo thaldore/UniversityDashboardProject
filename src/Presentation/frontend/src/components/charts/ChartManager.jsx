@@ -9,6 +9,7 @@ import '../../styles/components/chart-modals.css';
 const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators = [] }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [chartDetail, setChartDetail] = useState(null);
     const [formData, setFormData] = useState({
         chartName: '',
         chartType: ChartType.PieChart,
@@ -18,7 +19,9 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
         sectionId: sectionId || null,
         displayOrder: 1,
         showHistoricalData: false,
-        historicalDataDisplayType: null
+        historicalDataDisplayType: null,
+        showHistoricalInChart: false,
+        historicalPeriodCount: 3
     });
 
     const [selectedIndicators, setSelectedIndicators] = useState([]);
@@ -26,40 +29,109 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
     const [chartGroups, setChartGroups] = useState([]);
     const [indicatorSearchTerm, setIndicatorSearchTerm] = useState('');
 
+    // Fetch chart details when editing
+    useEffect(() => {
+        const fetchChartDetail = async () => {
+            if (chart && chart.chartId) {
+                try {
+                    setLoading(true);
+                    console.log('Fetching chart detail for chartId:', chart.chartId);
+                    const response = await chartService.getChartById(chart.chartId);
+                    console.log('Chart detail response:', response);
+                    console.log('Chart detail data:', response.data);
+                    setChartDetail(response);
+                } catch (err) {
+                    console.error('Error fetching chart detail:', err);
+                    setError('Chart detayları yüklenirken hata oluştu');
+                } finally {
+                    setLoading(false);
+                }
+            }
+        };
+
+        if (isOpen && chart) {
+            fetchChartDetail();
+        }
+    }, [isOpen, chart]);
+
     // Initialize form data when component mounts or chart changes
     useEffect(() => {
-        if (chart) {
+        const sourceChart = chartDetail ? chartDetail.data : (chart ? chart : null);
+        if (sourceChart) {
             // Edit mode - populate form with existing chart data
+            console.log('ChartManager editing chart - ALL PROPERTIES:', sourceChart);
+            console.log('Chart object keys:', Object.keys(sourceChart));
+            console.log('Chart historical settings:', {
+                showHistoricalData: sourceChart.showHistoricalData,
+                showHistoricalInChart: sourceChart.showHistoricalInChart,
+                historicalPeriodCount: sourceChart.historicalPeriodCount,
+                historicalDataDisplayType: sourceChart.historicalDataDisplayType,
+                // PascalCase versions
+                ShowHistoricalData: sourceChart.ShowHistoricalData,
+                ShowHistoricalInChart: sourceChart.ShowHistoricalInChart,
+                HistoricalPeriodCount: sourceChart.HistoricalPeriodCount,
+                HistoricalDataDisplayType: sourceChart.HistoricalDataDisplayType
+            });
+
             setFormData({
-                chartName: chart.chartName || '',
-                chartType: chart.chartType || ChartType.PieChart,
-                title: chart.title || '',
-                subtitle: chart.subtitle || '',
-                description: chart.description || '',
-                sectionId: chart.sectionId || sectionId,
-                displayOrder: chart.displayOrder || 1,
-                showHistoricalData: chart.showHistoricalData || false,
-                historicalDataDisplayType: chart.historicalDataDisplayType || null
+                chartName: sourceChart.chartName || sourceChart.ChartName || '',
+                chartType: sourceChart.chartType || sourceChart.ChartType || ChartType.PieChart,
+                title: sourceChart.title || sourceChart.Title || '',
+                subtitle: sourceChart.subtitle || sourceChart.Subtitle || '',
+                description: sourceChart.description || sourceChart.Description || '',
+                sectionId: sourceChart.sectionId || sourceChart.SectionId || sectionId,
+                displayOrder: sourceChart.displayOrder || sourceChart.DisplayOrder || 1,
+                showHistoricalData: sourceChart.showHistoricalData || sourceChart.ShowHistoricalData || false,
+                historicalDataDisplayType: sourceChart.historicalDataDisplayType || sourceChart.HistoricalDataDisplayType || null,
+                showHistoricalInChart: sourceChart.showHistoricalInChart || sourceChart.ShowHistoricalInChart || false,
+                historicalPeriodCount: sourceChart.historicalPeriodCount || sourceChart.HistoricalPeriodCount || 3
             });
 
             // Load existing indicators, filters, and groups if editing
-            if (chart.indicators) {
-                const mappedIndicators = chart.indicators.map((ind, index) => ({
-                    indicatorId: ind.indicatorId || ind.id,
-                    displayOrder: ind.displayOrder || index + 1,
-                    color: ind.color || CHART_COLORS[index % CHART_COLORS.length],
-                    label: ind.label || ind.name || '',
-                    isVisible: ind.isVisible !== undefined ? ind.isVisible : true
-                }));
+            if ((sourceChart.indicators && sourceChart.indicators.length > 0) || (sourceChart.Indicators && sourceChart.Indicators.length > 0)) {
+                const indicators = sourceChart.indicators || sourceChart.Indicators || [];
+                console.log('Original chart indicators:', indicators);
+                console.log('Indicators array length:', indicators.length);
+                
+                const mappedIndicators = indicators.map((ind, index) => {
+                    console.log(`Processing indicator ${index}:`, ind);
+                    const mapped = {
+                        indicatorId: ind.indicatorId || ind.IndicatorId || ind.id,
+                        displayOrder: ind.displayOrder || ind.DisplayOrder || index + 1,
+                        color: ind.color || ind.Color || CHART_COLORS[index % CHART_COLORS.length],
+                        label: ind.label || ind.Label || ind.indicatorName || ind.IndicatorName || ind.name || '',
+                        isVisible: ind.isVisible !== undefined ? ind.isVisible : (ind.IsVisible !== undefined ? ind.IsVisible : true)
+                    };
+                    console.log(`Mapped indicator ${index}:`, { original: ind, mapped });
+                    return mapped;
+                });
+                
+                console.log('Final mapped indicators:', mappedIndicators);
                 setSelectedIndicators(mappedIndicators);
+            } else {
+                console.log('No indicators found in chart. Checking both camelCase and PascalCase:', {
+                    'sourceChart.indicators': sourceChart.indicators,
+                    'sourceChart.Indicators': sourceChart.Indicators
+                });
+                setSelectedIndicators([]);
             }
 
-            if (chart.filters) {
-                setChartFilters(chart.filters);
+            if (sourceChart.filters || sourceChart.Filters) {
+                const filters = sourceChart.filters || sourceChart.Filters || [];
+                console.log('Chart filters found:', filters);
+                setChartFilters(filters);
+            } else {
+                console.log('No filters found');
+                setChartFilters([]);
             }
 
-            if (chart.groups) {
-                setChartGroups(chart.groups);
+            if (sourceChart.groups || sourceChart.Groups) {
+                const groups = sourceChart.groups || sourceChart.Groups || [];
+                console.log('Chart groups found:', groups);
+                setChartGroups(groups);
+            } else {
+                console.log('No groups found');
+                setChartGroups([]);
             }
         } else {
             // Create mode - reset form
@@ -72,13 +144,15 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                 sectionId: sectionId || null,
                 displayOrder: 1,
                 showHistoricalData: false,
-                historicalDataDisplayType: null
+                historicalDataDisplayType: null,
+                showHistoricalInChart: false,
+                historicalPeriodCount: 3
             });
             setSelectedIndicators([]);
             setChartFilters([]);
             setChartGroups([]);
         }
-    }, [chart, sectionId]);
+    }, [chart, chartDetail, sectionId]);
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -251,6 +325,9 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                 showHistoricalData: formData.showHistoricalData,
                 historicalDataDisplayType: formData.showHistoricalData ? 
                     parseInt(formData.historicalDataDisplayType) : null,
+                showHistoricalInChart: formData.showHistoricalInChart,
+                historicalPeriodCount: formData.showHistoricalInChart ? 
+                    parseInt(formData.historicalPeriodCount) : null,
                 indicators: selectedIndicators.map(ind => ({
                     indicatorId: parseInt(ind.indicatorId),
                     displayOrder: parseInt(ind.displayOrder),
@@ -388,6 +465,7 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                         <div className="form-section">
                             <h3>Geçmiş Veri Ayarları</h3>
                             <div className="form-grid">
+                                {/* Geçmiş Verileri Göster - Ayrı bölümde */}
                                 <div className="form-group">
                                     <label className="checkbox-label">
                                         <input
@@ -396,7 +474,7 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                                             checked={formData.showHistoricalData}
                                             onChange={handleInputChange}
                                         />
-                                        Geçmiş verileri göster
+                                        Geçmiş verileri göster (Ayrı bölümde)
                                     </label>
                                 </div>
 
@@ -416,7 +494,52 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                                         </select>
                                     </div>
                                 )}
+
+                                {/* Geçmiş Verileri Grafik İçinde Göster - Bağımsız */}
+                                <div className="form-group">
+                                    <label className="checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            name="showHistoricalInChart"
+                                            checked={formData.showHistoricalInChart}
+                                            onChange={handleInputChange}
+                                        />
+                                        Geçmiş verileri grafik içinde göster
+                                    </label>
+                                </div>
+
+                                {formData.showHistoricalInChart && (
+                                    <div className="form-group">
+                                        <label className="form-label">Gösterilecek Geçmiş Dönem Sayısı</label>
+                                        <select
+                                            name="historicalPeriodCount"
+                                            value={formData.historicalPeriodCount}
+                                            onChange={handleInputChange}
+                                            className="form-select"
+                                        >
+                                            <option value={2}>2 Dönem (Geçmiş 1 + Güncel)</option>
+                                            <option value={3}>3 Dönem (Geçmiş 2 + Geçmiş 1 + Güncel)</option>
+                                            <option value={4}>4 Dönem (Geçmiş 3 + Geçmiş 2 + Geçmiş 1 + Güncel)</option>
+                                            <option value={5}>5 Dönem (Geçmiş 4 + Geçmiş 3 + Geçmiş 2 + Geçmiş 1 + Güncel)</option>
+                                        </select>
+                                    </div>
+                                )}
                             </div>
+                            
+                            {formData.showHistoricalInChart && (
+                                <div className="historical-info-box">
+                                    <div className="info-icon">ℹ️</div>
+                                    <div className="info-text">
+                                        <strong>Grafik İçi Geçmiş Veri Görünümü:</strong>
+                                        <br />
+                                        Her gösterge için seçilen dönem sayısı kadar geçmiş veri grafikte gösterilecek.
+                                        <br />
+                                        Örnek: "Profesör Sayısı" göstergesi için 3 dönem seçilirse:
+                                        <br />
+                                        <em>• Geçmiş Dönem 2 • Geçmiş Dönem 1 • Güncel Dönem</em>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Indicators Selection */}
