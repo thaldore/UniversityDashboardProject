@@ -4,15 +4,16 @@ export const ChartType = {
     ColumnChart: 2,
     ComboChart: 3,
     DifferenceChart: 4,
-    DataTable: 5,
-    Column3D: 6
+    Column3D: 6,
+    Difference3D: 7
 };
 
 // Historical Data Display Types
 export const HistoricalDataDisplayType = {
     Table: 1,
     ComboChart: 2,
-    DifferenceChart: 3
+    StackedColumn: 3,
+    Column3D: 4
 };
 
 // Filter Types
@@ -37,10 +38,10 @@ export const getChartTypeText = (type) => {
             return 'Kombine Grafik';
         case ChartType.DifferenceChart:
             return 'Fark Grafiği';
-        case ChartType.DataTable:
-            return 'Veri Tablosu';
         case ChartType.Column3D:
             return '3D Sütun Grafiği';
+        case ChartType.Difference3D:
+            return '3D Fark Grafiği';
         default:
             return 'Bilinmeyen';
     }
@@ -52,8 +53,10 @@ export const getHistoricalDataDisplayTypeText = (type) => {
             return 'Tablo';
         case HistoricalDataDisplayType.ComboChart:
             return 'Kombine Grafik';
-        case HistoricalDataDisplayType.DifferenceChart:
-            return 'Fark Grafiği';
+        case HistoricalDataDisplayType.StackedColumn:
+            return 'Yığılmış Sütun';
+        case HistoricalDataDisplayType.Column3D:
+            return '3D Sütun';
         default:
             return 'Bilinmeyen';
     }

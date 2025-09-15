@@ -435,8 +435,8 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                                         <option value={ChartType.ColumnChart}>Sütun Grafiği</option>
                                         <option value={ChartType.ComboChart}>Kombine Grafik</option>
                                         <option value={ChartType.DifferenceChart}>Fark Grafiği</option>
-                                        <option value={ChartType.DataTable}>Veri Tablosu</option>
                                         <option value={ChartType.Column3D}>3D Sütun Grafiği</option>
+                                        <option value={ChartType.Difference3D}>3D Fark Grafiği</option>
                                     </select>
                                 </div>
 
@@ -495,7 +495,8 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                                             <option value="">Seçiniz</option>
                                             <option value={HistoricalDataDisplayType.Table}>Tablo</option>
                                             <option value={HistoricalDataDisplayType.ComboChart}>Kombine Grafik</option>
-                                            <option value={HistoricalDataDisplayType.DifferenceChart}>Fark Grafiği</option>
+                                            <option value={HistoricalDataDisplayType.StackedColumn}>Yığılmış Sütun</option>
+                                            <option value={HistoricalDataDisplayType.Column3D}>3D Sütun</option>
                                         </select>
                                     </div>
                                 )}

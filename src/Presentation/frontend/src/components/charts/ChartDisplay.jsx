@@ -5,6 +5,7 @@ import { ChartType, CHART_COLORS } from '../../services/utils/chartConstants';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, LineElement, PointElement } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import Chart3D from './Chart3D';
+import ChartDifference3D from './ChartDifference3D';
 
 // Register Chart.js components
 ChartJS.register(
@@ -375,7 +376,11 @@ const ChartDisplay = ({ chart }) => {
     const renderChart = () => {
         if (!chartData) return null;
 
-        const data = formatChartData(chartData);
+        // For Difference3D, prefer historical formatted data if available
+        const isDifference3D = chart.chartType === ChartType.Difference3D;
+        const data = isDifference3D && historicalData && historicalData.length > 0
+            ? formatHistoricalChartData({ currentData: chartData.currentData, historicalData })
+            : formatChartData(chartData);
         if (!data) {
             return (
                 <div className="chart-empty">
@@ -418,8 +423,15 @@ const ChartDisplay = ({ chart }) => {
                         <Chart3D data={data} options={options} />
                     </div>
                 );
-            case ChartType.DataTable:
-                return renderDataTable();
+            case ChartType.Difference3D:
+                return (
+                    <div className="chart-container">
+                        {historicalNote}
+                        <ChartDifference3D chart={chartDetails} chartData={chartData} formattedData={data} />
+                    </div>
+                );
+            // case ChartType.DataTable: // Deprecated
+            //     return renderDataTable();
             default:
                 return (
                     <div className="chart-container">
@@ -430,97 +442,166 @@ const ChartDisplay = ({ chart }) => {
         }
     };
 
-    const renderDataTable = () => {
-        if (!chartData || !chartData.values) return null;
-
-        return (
-            <div className="chart-data-table">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Gösterge</th>
-                            <th>Değer</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {chartData.labels.map((label, index) => (
-                            <tr key={index}>
-                                <td>{chartData.indicatorNames?.[index] || label}</td>
-                                <td>{chartData.values[index]}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        );
-    };
+    // Data table renderer removed (DataTable chart type deprecated)
 
     const renderHistoricalChart = () => {
         if (!historicalData || historicalData.length === 0) return null;
 
-        // Güncel veri ile geçmiş verileri birleştir
-        const allPeriodsData = [];
-        
-        // Önce güncel veriyi ekle
+    // Eğer HistoricalDataDisplayType.StackedColumn seçiliyse yüzde bazlı yığılmış sütunlar çiz
+    const useStacked100 = chartDetails.historicalDataDisplayType === 3; // StackedColumn
+
+        // Güncel + geçmiş dönemleri sırala (en eski -> güncel)
+        const periodsSorted = [...historicalData]
+            .sort((a, b) => (a.period || 0) - (b.period || 0));
+
+        // En sona güncel dönemi ekle
         if (chartData && chartData.currentData) {
-            allPeriodsData.push({
-                periodLabel: "Güncel Veri",
-                data: chartData.currentData
-            });
+            periodsSorted.push({ periodLabel: 'Güncel Dönem', data: chartData.currentData });
         }
-        
-        // Sonra geçmiş verileri ekle
-        allPeriodsData.push(...historicalData);
 
-        // Prepare data for historical chart
-        const labels = allPeriodsData.map(period => period.periodLabel);
-        const datasets = [];
+        const labels = periodsSorted.map(p => p.periodLabel);
 
-        // Get all unique indicators
-        const indicators = allPeriodsData[0]?.data || [];
+        // Eğer HistoricalDataDisplayType.Column3D ise: her dönem için TÜM göstergeleri ardışık olarak 3D sütunda göster
+        if (chartDetails.historicalDataDisplayType === 4) {
+            // Baz alınacak gösterge listesi ve renkleri (güncel veriden)
+            const baseIndicators = (chartData?.currentData || []).map((i, idx) => ({
+                key: i.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim(),
+                label: i.label,
+                color: i.color || CHART_COLORS[idx % CHART_COLORS.length]
+            }));
 
-        indicators.forEach((indicator, index) => {
-            const data = allPeriodsData.map(period => 
-                period.data?.find(item => item.label === indicator.label)?.value || 0
-            );
+            // Etiketler: her dönem + her gösterge (örn: "2023 - Gösterge 1")
+            const flatLabels = [];
+            const flatValues = [];
+            const flatColors = [];
 
-            datasets.push({
-                label: indicator.label,
-                data: data,
-                backgroundColor: indicator.color || CHART_COLORS[index % CHART_COLORS.length],
-                borderColor: indicator.color || CHART_COLORS[index % CHART_COLORS.length],
-                borderWidth: 2,
-                tension: 0.1
+            periodsSorted.forEach((period) => {
+                baseIndicators.forEach((ind) => {
+                    const item = (period.data || []).find(d => {
+                        const key = d.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim();
+                        return key === ind.key;
+                    });
+                    flatLabels.push(`${period.periodLabel} - ${ind.key}`);
+                    flatValues.push(item?.value || 0);
+                    flatColors.push(ind.color);
+                });
             });
+
+            const data3D = {
+                labels: flatLabels,
+                datasets: [{
+                    label: 'Dönem × Gösterge',
+                    data: flatValues,
+                    backgroundColor: flatColors
+                }]
+            };
+            const options3D = { plugins: { title: { display: true, text: 'Geçmiş Dönem - Gösterge Dağılımı (3D)' } } };
+            return (
+                <div style={{ height: '360px', marginBottom: '1rem' }}>
+                    <Chart3D data={data3D} options={options3D} />
+                </div>
+            );
+        }
+
+        // Baz alınacak gösterge listesi (renk ve sıralama için)
+        const baseIndicators = (chartData?.currentData || []).map((i, idx) => ({
+            key: i.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim(),
+            label: i.label,
+            color: i.color || CHART_COLORS[idx % CHART_COLORS.length]
+        }));
+
+        if (!useStacked100) {
+            // Eski line grafik (trend) davranışı
+            const datasets = baseIndicators.map((ind) => {
+                const data = periodsSorted.map(period => {
+                    const item = (period.data || []).find(d => {
+                        const key = d.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim();
+                        return key === ind.key;
+                    });
+                    return item?.value || 0;
+                });
+                return {
+                    label: ind.key,
+                    data,
+                    backgroundColor: ind.color,
+                    borderColor: ind.color,
+                    borderWidth: 2,
+                    tension: 0.1
+                };
+            });
+            const historicalChartData = { labels, datasets };
+            const historicalOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' }, title: { display: true, text: 'Geçmiş Dönem Trend Analizi' } },
+                scales: { y: { beginAtZero: true } }
+            };
+            return (
+                <div style={{ height: '300px', marginBottom: '1rem' }}>
+                    <Line data={historicalChartData} options={historicalOptions} />
+                </div>
+            );
+        }
+
+        // 100% stacked bar hesaplama
+    const datasets = baseIndicators.map((ind) => {
+            const data = periodsSorted.map(period => {
+                const items = period.data || [];
+                const total = items.reduce((sum, it) => sum + (it.value || 0), 0) || 1;
+                const item = items.find(d => {
+                    const key = d.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim();
+                    return key === ind.key;
+                });
+                const value = item?.value || 0;
+                const percent = (value / total) * 100;
+                return Number(percent.toFixed(2));
+            });
+            return {
+                label: ind.key,
+                data,
+                backgroundColor: ind.color,
+                borderColor: ind.color,
+                borderWidth: 1,
+                stack: 'percentage'
+            };
         });
 
-        const historicalChartData = {
-            labels,
-            datasets
-        };
-
-        const historicalOptions = {
+        const stackedData = { labels, datasets };
+        const stackedOptions = {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'top',
-                },
-                title: {
-                    display: true,
-                    text: 'Geçmiş Dönem Trend Analizi'
+                legend: { position: 'right' },
+                title: { display: true, text: 'Geçmiş Dönem Yüzdelik Dağılımı' },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const periodIndex = ctx.dataIndex;
+                            const period = periodsSorted[periodIndex];
+                            const items = period?.data || [];
+                            const match = items.find(d => d.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim() === ctx.dataset.label);
+                            const raw = match?.value ?? 0;
+                            const pct = typeof ctx.raw === 'number' ? ctx.raw.toFixed(2) : ctx.raw;
+                            return `${ctx.dataset.label}: ${pct}% (${raw})`;
+                        }
+                    }
                 }
             },
             scales: {
+                x: { stacked: true },
                 y: {
-                    beginAtZero: true
+                    stacked: true,
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: (val) => `${val}%`
+                    }
                 }
             }
         };
-
         return (
             <div style={{ height: '300px', marginBottom: '1rem' }}>
-                <Line data={historicalChartData} options={historicalOptions} />
+                <Bar data={stackedData} options={stackedOptions} />
             </div>
         );
     };

@@ -51,12 +51,15 @@ function Bar3D({ position, scale, color, value, onHover, onLeave, isHovered }) {
             
             {/* Value label on top */}
             <Text
-                position={[0, scale[1] / 2 + 0.3, 0]}
-                fontSize={0.25}
-                color="#333"
+                position={[0, scale[1] / 2 + 0.32, 0]}
+                fontSize={0.28}
+                color="#000"
                 anchorX="center"
                 anchorY="middle"
                 fontWeight="bold"
+                outlineWidth={0.01}
+                outlineColor="#ffffff"
+                billboard
             >
                 {value}
             </Text>
@@ -65,10 +68,8 @@ function Bar3D({ position, scale, color, value, onHover, onLeave, isHovered }) {
 }
 
 // Enhanced Grid component with coordinate system box matching the reference image
-function Grid() {
-    const chartWidth = 8;
-    const chartHeight = 4;
-    const chartDepth = 6;
+function Grid({ metrics }) {
+    const { chartWidth, chartHeight, chartDepth, gridXCount = 8, gridZCount = 3 } = metrics;
     
     return (
         <group>
@@ -92,7 +93,7 @@ function Grid() {
                 <meshLambertMaterial color="#f0f0f0" transparent opacity={0.6} />
             </mesh>
             
-            {/* Left wall */}
+            {/* Left wall (sağ yerine sol yüz) */}
             <mesh
                 position={[-chartWidth/2, chartHeight/2, 0]}
                 rotation={[0, Math.PI / 2, 0]}
@@ -103,14 +104,14 @@ function Grid() {
             </mesh>
             
             {/* Internal grid lines on bottom */}
-            {Array.from({ length: 9 }, (_, i) => (
+            {Array.from({ length: gridXCount + 1 }, (_, i) => (
                 <line key={`grid-x-${i}`}>
                     <bufferGeometry>
                         <bufferAttribute
                             attach="attributes-position"
                             array={new Float32Array([
-                                -chartWidth/2 + (i * chartWidth/8), 0.01, -chartDepth/2,
-                                -chartWidth/2 + (i * chartWidth/8), 0.01, chartDepth/2
+                                -chartWidth/2 + (i * (chartWidth / gridXCount)), 0.01, -chartDepth/2,
+                                -chartWidth/2 + (i * (chartWidth / gridXCount)), 0.01, chartDepth/2
                             ])}
                             count={2}
                             itemSize={3}
@@ -120,14 +121,14 @@ function Grid() {
                 </line>
             ))}
             
-            {Array.from({ length: 7 }, (_, i) => (
+            {Array.from({ length: gridZCount + 1 }, (_, i) => (
                 <line key={`grid-z-${i}`}>
                     <bufferGeometry>
                         <bufferAttribute
                             attach="attributes-position"
                             array={new Float32Array([
-                                -chartWidth/2, 0.01, -chartDepth/2 + (i * chartDepth/6),
-                                chartWidth/2, 0.01, -chartDepth/2 + (i * chartDepth/6)
+                                -chartWidth/2, 0.01, -chartDepth/2 + (i * (chartDepth / gridZCount)),
+                                chartWidth/2, 0.01, -chartDepth/2 + (i * (chartDepth / gridZCount))
                             ])}
                             count={2}
                             itemSize={3}
@@ -138,14 +139,14 @@ function Grid() {
             ))}
             
             {/* Vertical grid lines on back wall */}
-            {Array.from({ length: 9 }, (_, i) => (
+            {Array.from({ length: gridXCount + 1 }, (_, i) => (
                 <line key={`grid-back-v-${i}`}>
                     <bufferGeometry>
                         <bufferAttribute
                             attach="attributes-position"
                             array={new Float32Array([
-                                -chartWidth/2 + (i * chartWidth/8), 0, -chartDepth/2,
-                                -chartWidth/2 + (i * chartWidth/8), chartHeight, -chartDepth/2
+                                -chartWidth/2 + (i * (chartWidth / gridXCount)), 0, -chartDepth/2,
+                                -chartWidth/2 + (i * (chartWidth / gridXCount)), chartHeight, -chartDepth/2
                             ])}
                             count={2}
                             itemSize={3}
@@ -174,14 +175,14 @@ function Grid() {
             ))}
             
             {/* Vertical grid lines on left wall */}
-            {Array.from({ length: 7 }, (_, i) => (
+            {Array.from({ length: gridZCount + 1 }, (_, i) => (
                 <line key={`grid-left-v-${i}`}>
                     <bufferGeometry>
                         <bufferAttribute
                             attach="attributes-position"
                             array={new Float32Array([
-                                -chartWidth/2, 0, -chartDepth/2 + (i * chartDepth/6),
-                                -chartWidth/2, chartHeight, -chartDepth/2 + (i * chartDepth/6)
+                                -chartWidth/2, 0, -chartDepth/2 + (i * (chartDepth / gridZCount)),
+                                -chartWidth/2, chartHeight, -chartDepth/2 + (i * (chartDepth / gridZCount))
                             ])}
                             count={2}
                             itemSize={3}
@@ -208,19 +209,13 @@ function Grid() {
                     <lineBasicMaterial color="#ddd" />
                 </line>
             ))}
-            
-            {/* Chart area outline edges */}
-            <lineSegments>
-                <edgesGeometry args={[new THREE.BoxGeometry(chartWidth, chartHeight, chartDepth)]} />
-                <lineBasicMaterial color="#999" />
-            </lineSegments>
         </group>
     );
 }
 
 // X-axis labels component
-function XAxisLabels({ labels }) {
-    const chartWidth = 8;
+function XAxisLabels({ labels, metrics }) {
+    const { chartWidth, chartDepth } = metrics;
     const barSpacing = chartWidth / (labels.length + 1);
     
     return (
@@ -228,12 +223,15 @@ function XAxisLabels({ labels }) {
             {labels.map((label, index) => (
                 <Text
                     key={index}
-                    position={[-chartWidth/2 + barSpacing * (index + 1), -0.8, 3.5]}
-                    fontSize={0.3}
-                    color="#333"
+                    position={[-chartWidth/2 + barSpacing * (index + 1), 0.02, chartDepth/2 + 0.7]}
+                    fontSize={Math.max(0.18, Math.min(0.26, 2.2 / Math.max(4, labels.length)))}
+                    color="#000"
                     anchorX="center"
                     anchorY="middle"
-                    rotation={[0, 0, 0]}
+                    rotation={[-Math.PI / 22, 0, 0]}
+                    maxWidth={1.4}
+                    lineHeight={1.05}
+                    billboard
                 >
                     {label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim()}
                 </Text>
@@ -243,10 +241,8 @@ function XAxisLabels({ labels }) {
 }
 
 // Y-axis scale
-function YAxisScale({ maxValue, steps = 6 }) {
-    const chartHeight = 4;
-    const chartWidth = 8;
-    const chartDepth = 6;
+function YAxisScale({ maxValue, steps = 6, metrics }) {
+    const { chartHeight, chartWidth, chartDepth } = metrics;
     
     const scaleLabels = [];
     for (let i = 0; i <= steps; i++) {
@@ -254,12 +250,13 @@ function YAxisScale({ maxValue, steps = 6 }) {
         scaleLabels.push(
             <Text
                 key={i}
-                position={[-chartWidth/2 - 0.8, (i / steps) * chartHeight, chartDepth/2 + 0.5]}
-                fontSize={0.3}
-                color="#666"
+                position={[-chartWidth/2 - 0.5, (i / steps) * chartHeight, chartDepth/2 + 0.5]}
+                fontSize={0.26}
+                color="#000"
                 anchorX="center"
                 anchorY="middle"
-                rotation={[0, Math.PI / 4, 0]}
+                rotation={[0, 0, 0]}
+                billboard
             >
                 {value}
             </Text>
@@ -377,9 +374,18 @@ export default function Chart3D({ data, options = {} }) {
             '#FC8452'   // Orange
         ];
         
-        const bars = [];
-        const colors = [];
-        const maxValue = Math.max(...data.datasets.flatMap(d => d.data));
+    const bars = [];
+    const colors = [];
+    const maxValue = Math.max(...data.datasets.flatMap(d => d.data));
+
+    // Dinamik ölçüler: label sayısına göre genişlik ve derinlik
+    const labelCount = Math.max(1, data.labels.length);
+    const baseBarGap = 1.1; // bar genişliği 1 kabul; arada boşluk +0.1
+    const chartWidth = Math.min(30, Math.max(8, labelCount * baseBarGap + 1));
+    const chartDepth = 3; // önden görünümün korunduğu derinlik
+    const chartHeight = 4; // sabit yükseklik (normalize ile dolduruluyor)
+    const gridXCount = Math.min(10, Math.max(6, labelCount));
+    const gridZCount = 3;
         
         console.log('Chart3D maxValue:', maxValue);
         console.log('Chart3D datasets:', data.datasets);
@@ -387,13 +393,16 @@ export default function Chart3D({ data, options = {} }) {
         
         data.datasets.forEach((dataset, datasetIndex) => {
             dataset.data.forEach((value, labelIndex) => {
-                // Her indicator için farklı renk
-                const color = defaultColors[labelIndex % defaultColors.length];
+                // Her indicator için doğru renk (Chart.js backgroundColor'dan al)
+                const color = dataset.backgroundColor && Array.isArray(dataset.backgroundColor) 
+                    ? dataset.backgroundColor[labelIndex] || defaultColors[labelIndex % defaultColors.length]
+                    : defaultColors[labelIndex % defaultColors.length];
+                
                 colors.push(color);
                 
                 const normalizedHeight = (value / maxValue) * 4; // Scale to max height of 4 units
-                const chartWidth = 8;
                 const barSpacing = chartWidth / (data.labels.length + 1);
+                const barXZ = Math.max(0.5, Math.min(0.9, 8 / chartWidth));
                 
                 bars.push({
                     position: [
@@ -401,7 +410,7 @@ export default function Chart3D({ data, options = {} }) {
                         normalizedHeight / 2, 
                         0
                     ],
-                    scale: [0.6, normalizedHeight, 0.6],
+                    scale: [barXZ, normalizedHeight, barXZ],
                     color: color,
                     value: value,
                     label: data.labels[labelIndex],
@@ -413,7 +422,8 @@ export default function Chart3D({ data, options = {} }) {
         
         console.log('Chart3D prepared bars:', bars);
         
-        return { bars, colors, maxValue };
+        const metrics = { chartWidth, chartHeight, chartDepth, gridXCount, gridZCount };
+        return { bars, colors, maxValue, metrics };
     }, [data]);
     
     const handleBarHover = (bar, event) => {
@@ -446,21 +456,7 @@ export default function Chart3D({ data, options = {} }) {
             minHeight: '500px',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         }}>
-            {/* Debug Info */}
-            {import.meta.env.DEV && (
-                <div style={{ 
-                    position: 'absolute', 
-                    top: '10px', 
-                    left: '10px', 
-                    background: 'rgba(0,0,0,0.7)', 
-                    color: 'white', 
-                    padding: '8px', 
-                    fontSize: '12px',
-                    zIndex: 1000
-                }}>
-                    Bars: {preparedData.bars.length} | Max: {preparedData.maxValue}
-                </div>
-            )}
+            {/* Debug Info removed for clean UI */}
             
             {/* Chart Area */}
             <div style={{ flex: '1', position: 'relative' }}>
@@ -495,8 +491,9 @@ export default function Chart3D({ data, options = {} }) {
                 >
                     <Canvas
                         camera={{ 
-                            position: [8, 4, 8], 
-                            fov: 50,
+                            // Dinamik olarak uzaklaştır: genişlik arttıkça kamera uzaklaşsın
+                            position: [0, 3.2, Math.max(12, (preparedData.metrics?.chartWidth || 8) * 1.6)], 
+                            fov: 30,
                             near: 0.1,
                             far: 1000
                         }}
@@ -524,13 +521,13 @@ export default function Chart3D({ data, options = {} }) {
                         />
                         
                         {/* Grid and Base */}
-                        <Grid />
+                        <Grid metrics={preparedData.metrics} />
                         
                         {/* Remove test cube */}
                         
                         {/* Axis Labels */}
-                        <XAxisLabels labels={data?.labels || []} />
-                        <YAxisScale maxValue={preparedData.maxValue} />
+                        <XAxisLabels labels={data?.labels || []} metrics={preparedData.metrics} />
+                        <YAxisScale maxValue={preparedData.maxValue} metrics={preparedData.metrics} />
                         
                         {/* 3D Bars */}
                         {preparedData.bars.map((bar) => (
@@ -550,13 +547,11 @@ export default function Chart3D({ data, options = {} }) {
                         <OrbitControls 
                             enablePan={false}
                             enableZoom={true}
-                            enableRotate={true}
-                            maxPolarAngle={Math.PI / 2.5}
-                            minPolarAngle={Math.PI / 4}
-                            minDistance={5}
-                            maxDistance={15}
+                            enableRotate={false}
+                            minDistance={Math.max(8, (preparedData.metrics?.chartWidth || 8) * 1.0)}
+                            maxDistance={Math.min(60, (preparedData.metrics?.chartWidth || 8) * 2.4)}
                             autoRotate={false}
-                            target={[0, 0, 0]}
+                            target={[0, 1.6, 0]}
                         />
                     </Canvas>
                     
@@ -594,21 +589,26 @@ export default function Chart3D({ data, options = {} }) {
                             <div key={index} style={{ 
                                 display: 'flex', 
                                 alignItems: 'center', 
-                                gap: '12px'
+                                gap: '8px',
+                                marginBottom: '6px',
+                                padding: '4px 0'
                             }}>
                                 <div 
                                     style={{
-                                        width: '20px',
-                                        height: '20px',
+                                        width: '16px',
+                                        height: '16px',
                                         backgroundColor: preparedData.colors[index],
-                                        borderRadius: '4px',
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                        borderRadius: '3px',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                                        flexShrink: 0
                                     }}
                                 />
                                 <span style={{ 
-                                    fontSize: '13px', 
+                                    fontSize: '11px', 
                                     color: '#495057',
-                                    fontWeight: '500'
+                                    fontWeight: '500',
+                                    lineHeight: '1.2',
+                                    wordBreak: 'break-word'
                                 }}>
                                     {label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim()}
                                 </span>
