@@ -207,13 +207,13 @@ function ZAxisLabels({ labels, metrics }) {
       {labels.map((label, i) => (
         <Text
           key={i}
-          position={[-chartWidth / 2 - 0.6, 0.1, -chartDepth / 2 + spacing * (i + 1)]}
+          position={[chartWidth / 2 + 0.6, 0.1, -chartDepth / 2 + spacing * (i + 1)]}
           fontSize={Math.max(0.18, Math.min(0.26, 2.2 / Math.max(4, labels.length)))}
           color="#000"
-          anchorX="right"
+          anchorX="left"
           anchorY="middle"
           rotation={[0, 0, 0]}
-          maxWidth={2.0}
+          maxWidth={2.2}
           lineHeight={1.05}
           billboard
         >
@@ -271,7 +271,7 @@ function Tooltip({ visible, position, content }) {
   );
 }
 
-export default function ChartDifference3D({ formattedData }) {
+export default function ChartDifference3D({ formattedData, chart }) {
   const [hovered, setHovered] = useState(null);
   const [tooltip, setTooltip] = useState({ visible: false, position: { x: 0, y: 0 }, content: null });
   const canvasRef = useRef();
@@ -284,9 +284,22 @@ export default function ChartDifference3D({ formattedData }) {
     const indicators = formattedData.datasets.map(d => d.label); // Z-axis
 
     // Build color map per indicator
+    // Group color override: if chart has groups, map indicatorId to group color
+    const groupColorMap = new Map();
+    if (chart?.groups) {
+      chart.groups.forEach(g => {
+        (g.indicators || []).forEach(ind => {
+          groupColorMap.set(ind.indicatorId || ind.IndicatorId, g.color);
+        });
+      });
+    }
+
     const colors = formattedData.datasets.map((d, i) => {
-      const c = Array.isArray(d.backgroundColor) ? d.backgroundColor[0] : d.backgroundColor;
-      return c || ['#5470C6', '#FF6B6B', '#91CC75', '#FAC858', '#EE6666', '#73C0DE'][i % 6];
+      const baseColor = Array.isArray(d.backgroundColor) ? d.backgroundColor[0] : d.backgroundColor;
+      // Try to derive indicator id from dataset meta if available
+      const indicatorId = d.indicatorId || d.indicatorID || d.id;
+      const groupColor = indicatorId ? groupColorMap.get(indicatorId) : null;
+      return groupColor || baseColor || ['#5470C6', '#FF6B6B', '#91CC75', '#FAC858', '#EE6666', '#73C0DE'][i % 6];
     });
 
     // Compute max value over all (for scale)
@@ -338,7 +351,7 @@ export default function ChartDifference3D({ formattedData }) {
       xLabels: periods,
       zLabels: indicators
     };
-  }, [formattedData]);
+  }, [formattedData, chart]);
 
   const onHover = (bar, event) => {
     setHovered(bar.id);
@@ -362,7 +375,7 @@ export default function ChartDifference3D({ formattedData }) {
           style={{ width: '100%', height: 450, position: 'relative', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
         >
           <Canvas
-            camera={{ position: [0, 3.2, Math.max(12, (prepared.metrics?.chartWidth || 8) * 1.6)], fov: 30, near: 0.1, far: 1000 }}
+            camera={{ position: [0, 3.4, Math.max(14, (prepared.metrics?.chartWidth || 8) * 2.0)], fov: 30, near: 0.1, far: 1000 }}
             shadows
             style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}
           >

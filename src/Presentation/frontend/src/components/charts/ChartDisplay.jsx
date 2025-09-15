@@ -27,6 +27,7 @@ const ChartDisplay = ({ chart }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedFilter, setSelectedFilter] = useState(null);
+    const [hiddenGroups, setHiddenGroups] = useState([]); // gizlenen gruplar (groupId listesi)
     
     const currentPeriod = periodService.getCurrentPeriod();
 
@@ -191,10 +192,12 @@ const ChartDisplay = ({ chart }) => {
             data.currentData.forEach(item => {
                 // Clean the label - remove period suffix for legend
                 const cleanLabel = item.label.replace(/\s*-\s*Güncel Dönem\s*$/, '').trim();
+                const indicatorId = item.additionalData?.IndicatorId;
                 indicators.push({
                     label: cleanLabel, // Use clean label for legend
                     originalLabel: item.label, // Keep original for data matching
-                    color: CHART_COLORS[indicators.length % CHART_COLORS.length]
+                    color: CHART_COLORS[indicators.length % CHART_COLORS.length],
+                    indicatorId
                 });
             });
         }
@@ -239,7 +242,8 @@ const ChartDisplay = ({ chart }) => {
                 backgroundColor: indicator.color,
                 borderColor: indicator.color,
                 borderWidth: 1,
-                tension: 0.1
+                tension: 0.1,
+                indicatorId: indicator.indicatorId
             };
         });
 
@@ -253,53 +257,85 @@ const ChartDisplay = ({ chart }) => {
         return result;
     };
 
-    const formatGroupedChartData = (data) => {
-        const datasets = [];
-        
-        chartDetails.groups.forEach(group => {
-            // Her grup için ayrı dataset oluştur
-            const groupData = [];
-            const groupLabels = [];
-            
-            group.indicators.forEach(indicator => {
-                const dataItem = data.currentData.find(item => 
-                    item.additionalData?.IndicatorId === indicator.indicatorId
-                );
-                
-                if (dataItem) {
-                    groupData.push(dataItem.value);
-                    groupLabels.push(dataItem.label);
-                }
-            });
+    // Difference3D için: yalnızca güncel dönemli format
+    const formatDifference3DCurrentOnly = (data) => {
+        if (!data || !data.currentData || data.currentData.length === 0) return null;
+        // Periyotlar: sadece Güncel Dönem
+        const periodLabels = ['Güncel Dönem'];
+        // Göstergeleri chartDetails.indicators sırası ile al
+        const order = (chartDetails.indicators || []).map(ind => ({ id: ind.indicatorId, name: ind.label || ind.indicatorName || ind.indicatorCode }));
+        // Dataset: her gösterge = 1 değerlik liste
+        const datasets = order.map((o, idx) => {
+            const item = data.currentData.find(d => d.additionalData?.IndicatorId === o.id);
+            const value = item?.value ?? 0;
+            const baseColor = item?.color || CHART_COLORS[idx % CHART_COLORS.length];
+            return {
+                label: o.name,
+                data: [value],
+                backgroundColor: baseColor,
+                borderColor: baseColor,
+                borderWidth: 1,
+                indicatorId: o.id
+            };
+        });
+        return { labels: periodLabels, datasets };
+    };
 
-            if (groupData.length > 0) {
-                datasets.push({
-                    label: group.groupName,
-                    data: groupData,
-                    backgroundColor: group.color,
-                    borderColor: group.color,
-                    borderWidth: 1,
-                    tension: 0.1
-                });
-            }
+    const formatGroupedChartData = (data) => {
+        // Gösterge sırasını koru
+        const indicators = (chartDetails.indicators || []).map(ind => ({
+            id: ind.indicatorId,
+            label: ind.label || ind.indicatorName || ind.indicatorCode,
+            fallbackColor: ind.color
+        }));
+        const labels = indicators.map(i => i.label);
+
+        // Her gösterge için değer al
+        const values = indicators.map(ind => {
+            const dataItem = data.currentData.find(item => item.additionalData?.IndicatorId === ind.id);
+            return dataItem ? dataItem.value : 0;
         });
 
-        // Tüm group'ların label'larını birleştir
-        const allLabels = [];
-        chartDetails.groups.forEach(group => {
-            group.indicators.forEach(indicator => {
-                const dataItem = data.currentData.find(item => 
-                    item.additionalData?.IndicatorId === indicator.indicatorId
-                );
-                if (dataItem && !allLabels.includes(dataItem.label)) {
-                    allLabels.push(dataItem.label);
-                }
+        // Grup renklerine göre bar renklendirme (sadece tek dataset)
+        const groupColorMap = new Map();
+        (chartDetails.groups || []).forEach(g => {
+            (g.indicators || []).forEach(gi => {
+                groupColorMap.set(gi.indicatorId, g.color);
             });
+        });
+
+        const backgroundColors = indicators.map(ind => {
+            const color = groupColorMap.get(ind.id) || ind.fallbackColor || CHART_COLORS[indicators.indexOf(ind) % CHART_COLORS.length];
+            // Eğer gösterge ait olduğu grup gizlendiyse şeffaf yap
+            const owningGroup = (chartDetails.groups || []).find(g => (g.indicators || []).some(gi => gi.indicatorId === ind.id));
+            if (owningGroup && hiddenGroups.includes(owningGroup.groupId)) {
+                return 'rgba(0,0,0,0)';
+            }
+            return color;
+        });
+
+        const dataValues = values.map((v, idx) => {
+            const indicatorId = indicators[idx].id;
+            const owningGroup = (chartDetails.groups || []).find(g => (g.indicators || []).some(gi => gi.indicatorId === indicatorId));
+            if (owningGroup && hiddenGroups.includes(owningGroup.groupId)) {
+                return null; // gizlenmiş grup => değer yok
+            }
+            return v;
         });
 
         return {
-            labels: allLabels,
-            datasets
+            labels,
+            datasets: [
+                {
+                    label: chartDetails.title || 'Veri',
+                    data: dataValues,
+                    backgroundColor: backgroundColors,
+                    borderColor: backgroundColors,
+                    borderWidth: 1,
+                    categoryPercentage: 0.8,
+                    barPercentage: 0.8
+                }
+            ]
         };
     };
 
@@ -338,6 +374,37 @@ const ChartDisplay = ({ chart }) => {
                 }
             }
         };
+
+        // Gruplandırılmış tek dataset durumunda legend'ı grupları gösterecek şekilde manuel oluştur
+        if (chartDetails.groups && chartDetails.groups.length > 0) {
+            baseOptions.plugins.legend = {
+                display: true,
+                onClick: (e, legendItem) => {
+                    const groupId = legendItem?.__groupId;
+                    if (!groupId) return;
+                    setHiddenGroups(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]);
+                },
+                labels: {
+                    usePointStyle: true,
+                    pointStyle: 'circle',
+                    color: '#555', // tutarlı açık siyah/gri ton
+                    generateLabels: () => {
+                        return (chartDetails.groups || []).map(g => {
+                            const hidden = hiddenGroups.includes(g.groupId);
+                            return {
+                                text: g.groupName,
+                                fillStyle: g.color,
+                                strokeStyle: g.color,
+                                hidden,
+                                lineWidth: 1,
+                                pointStyle: 'circle',
+                                __groupId: g.groupId
+                            };
+                        });
+                    }
+                }
+            };
+        }
 
         // Chart type specific options
         switch (chart.chartType) {
@@ -378,9 +445,16 @@ const ChartDisplay = ({ chart }) => {
 
         // For Difference3D, prefer historical formatted data if available
         const isDifference3D = chart.chartType === ChartType.Difference3D;
-        const data = isDifference3D && historicalData && historicalData.length > 0
-            ? formatHistoricalChartData({ currentData: chartData.currentData, historicalData })
-            : formatChartData(chartData);
+        let data;
+        if (isDifference3D) {
+            if (chartDetails.showHistoricalInChart && historicalData && historicalData.length > 0) {
+                data = formatHistoricalChartData({ currentData: chartData.currentData, historicalData });
+            } else {
+                data = formatDifference3DCurrentOnly({ currentData: chartData.currentData });
+            }
+        } else {
+            data = formatChartData(chartData);
+        }
         if (!data) {
             return (
                 <div className="chart-empty">
@@ -496,9 +570,20 @@ const ChartDisplay = ({ chart }) => {
                 }]
             };
             const options3D = { plugins: { title: { display: true, text: 'Geçmiş Dönem - Gösterge Dağılımı (3D)' } } };
+
+            // Grup bilgisi: her dönem için kaç gösterge (groupSize)
+            const groupSize = baseIndicators.length;
+            const periodOnlyLabels = labels; // Grup başlıkları olarak sadece dönem adları
+            const legendItems = baseIndicators.map(b => ({ label: b.key, color: b.color }));
             return (
                 <div style={{ height: '360px', marginBottom: '1rem' }}>
-                    <Chart3D data={data3D} options={options3D} />
+                    <Chart3D 
+                        data={data3D} 
+                        options={options3D}
+                        groupLabels={periodOnlyLabels}
+                        groupSize={groupSize}
+                        legendItems={legendItems}
+                    />
                 </div>
             );
         }

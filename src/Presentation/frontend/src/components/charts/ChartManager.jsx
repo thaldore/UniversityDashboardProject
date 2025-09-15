@@ -128,8 +128,15 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
             }
 
             if (sourceChart.groups || sourceChart.Groups) {
-                const groups = sourceChart.groups || sourceChart.Groups || [];
-                console.log('Chart groups found:', groups);
+                const groups = (sourceChart.groups || sourceChart.Groups || []).map((g, idx) => ({
+                    groupName: g.groupName || g.GroupName || `Grup ${idx+1}`,
+                    description: g.description || g.Description || '',
+                    displayOrder: g.displayOrder || g.DisplayOrder || idx + 1,
+                    color: g.color || g.Color || CHART_COLORS[idx % CHART_COLORS.length],
+                    // Backend edit sırasında 'indicators' listesi varsa indicatorIds türet
+                    indicatorIds: g.indicatorIds ? g.indicatorIds : (g.indicators ? g.indicators.map(x => x.indicatorId || x.IndicatorId) : [])
+                }));
+                console.log('Chart groups normalized:', groups);
                 setChartGroups(groups);
             } else {
                 console.log('No groups found');

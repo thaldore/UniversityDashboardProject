@@ -214,28 +214,37 @@ function Grid({ metrics }) {
 }
 
 // X-axis labels component
-function XAxisLabels({ labels, metrics }) {
+function XAxisLabels({ labels, metrics, totalBars, groupSize }) {
     const { chartWidth, chartDepth } = metrics;
-    const barSpacing = chartWidth / (labels.length + 1);
-    
+    const useGrouping = groupSize && totalBars && groupSize > 0 && labels && labels.length > 0 && labels.length * groupSize === totalBars;
+    const barSpacing = chartWidth / ((useGrouping ? totalBars : labels.length) + 1);
+
     return (
         <group>
-            {labels.map((label, index) => (
-                <Text
-                    key={index}
-                    position={[-chartWidth/2 + barSpacing * (index + 1), 0.02, chartDepth/2 + 0.7]}
-                    fontSize={Math.max(0.18, Math.min(0.26, 2.2 / Math.max(4, labels.length)))}
-                    color="#000"
-                    anchorX="center"
-                    anchorY="middle"
-                    rotation={[-Math.PI / 22, 0, 0]}
-                    maxWidth={1.4}
-                    lineHeight={1.05}
-                    billboard
-                >
-                    {label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim()}
-                </Text>
-            ))}
+            {(labels || []).map((label, index) => {
+                let centerIndex = index;
+                if (useGrouping) {
+                    centerIndex = index * groupSize + (groupSize - 1) / 2;
+                }
+                const posX = -chartWidth / 2 + barSpacing * (centerIndex + 1);
+                const display = label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim();
+                return (
+                    <Text
+                        key={index}
+                        position={[posX, 0.02, chartDepth / 2 + 0.7]}
+                        fontSize={Math.max(0.18, Math.min(0.26, 2.2 / Math.max(4, (labels || []).length)))}
+                        color="#000"
+                        anchorX="center"
+                        anchorY="middle"
+                        rotation={[-Math.PI / 22, 0, 0]}
+                        maxWidth={1.6}
+                        lineHeight={1.05}
+                        billboard
+                    >
+                        {display}
+                    </Text>
+                );
+            })}
         </group>
     );
 }
@@ -348,7 +357,7 @@ function Legend({ datasets, colors }) {
 }
 
 // Main Chart3D component with image-matching design
-export default function Chart3D({ data, options = {} }) {
+export default function Chart3D({ data, options = {}, legendItems, groupLabels, groupSize }) {
     const [hoveredBar, setHoveredBar] = useState(null);
     const [tooltip, setTooltip] = useState({ visible: false, position: { x: 0, y: 0 }, content: null });
     const canvasRef = useRef();
@@ -491,8 +500,8 @@ export default function Chart3D({ data, options = {} }) {
                 >
                     <Canvas
                         camera={{ 
-                            // Dinamik olarak uzaklaştır: genişlik arttıkça kamera uzaklaşsın
-                            position: [0, 3.2, Math.max(12, (preparedData.metrics?.chartWidth || 8) * 1.6)], 
+                            // Biraz daha uzak: çarpanı 1.6 -> 2.0
+                            position: [0, 3.4, Math.max(14, (preparedData.metrics?.chartWidth || 8) * 2.0)], 
                             fov: 30,
                             near: 0.1,
                             far: 1000
@@ -526,7 +535,12 @@ export default function Chart3D({ data, options = {} }) {
                         {/* Remove test cube */}
                         
                         {/* Axis Labels */}
-                        <XAxisLabels labels={data?.labels || []} metrics={preparedData.metrics} />
+                        <XAxisLabels 
+                            labels={groupLabels || (data?.labels || [])} 
+                            metrics={preparedData.metrics} 
+                            totalBars={(preparedData?.bars || []).length}
+                            groupSize={groupSize}
+                        />
                         <YAxisScale maxValue={preparedData.maxValue} metrics={preparedData.metrics} />
                         
                         {/* 3D Bars */}
@@ -566,7 +580,33 @@ export default function Chart3D({ data, options = {} }) {
             
             {/* Legend Panel */}
             <div style={{ width: '250px', flexShrink: 0 }}>
-                {data?.labels && (
+                {(legendItems && legendItems.length > 0) ? (
+                    <div className="chart-3d-legend" style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        gap: '12px', 
+                        marginTop: '20px',
+                        padding: '16px',
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '8px',
+                        border: '1px solid #e9ecef'
+                    }}>
+                        <div style={{ 
+                            fontSize: '14px', 
+                            fontWeight: '600', 
+                            color: '#495057',
+                            marginBottom: '8px'
+                        }}>
+                            Göstergeler
+                        </div>
+                        {legendItems.map((it, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', padding: '4px 0' }}>
+                                <div style={{ width: '16px', height: '16px', backgroundColor: it.color, borderRadius: '3px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', flexShrink: 0 }} />
+                                <span style={{ fontSize: '11px', color: '#495057', fontWeight: '500', lineHeight: '1.2', wordBreak: 'break-word' }}>{it.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (data?.labels && (
                     <div className="chart-3d-legend" style={{ 
                         display: 'flex', 
                         flexDirection: 'column',
@@ -615,7 +655,7 @@ export default function Chart3D({ data, options = {} }) {
                             </div>
                         ))}
                     </div>
-                )}
+                ))}
             </div>
         </div>
     );
