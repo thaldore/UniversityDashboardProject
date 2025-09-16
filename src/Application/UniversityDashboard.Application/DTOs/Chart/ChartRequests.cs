@@ -79,7 +79,13 @@ namespace UniversityDashBoardProject.Application.DTOs.Chart
         public string? Description { get; set; }
         public int DisplayOrder { get; set; }
         public string? Color { get; set; }
+        public GroupType GroupType { get; set; } = GroupType.ColorGroup;
+        public int? ParentGroupId { get; set; }
         public List<int> IndicatorIds { get; set; } = new();
+        
+        // Frontend'den gelen geçici ID'lar için
+        public string? ClientId { get; set; }
+        public string? ParentClientId { get; set; }
     }
 
     public class ChartDataRequest

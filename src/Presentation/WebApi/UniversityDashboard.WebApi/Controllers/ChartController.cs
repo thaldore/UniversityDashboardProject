@@ -191,25 +191,28 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
         /// </summary>
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<bool>> UpdateChart(int id, [FromBody] UpdateChartRequest request)
+        public async Task<ActionResult<bool>> UpdateChart(int id, [FromBody] UpdateChartRequest updateRequest)
         {
+            if (updateRequest == null)
+                return BadRequest("Request body is required.");
+
             var command = new UpdateChartCommand
             {
                 ChartId = id,
-                ChartName = request.ChartName,
-                ChartType = request.ChartType,
-                Title = request.Title,
-                Subtitle = request.Subtitle,
-                Description = request.Description,
-                DisplayOrder = request.DisplayOrder,
-                IsActive = request.IsActive,
-                ShowHistoricalData = request.ShowHistoricalData,
-                HistoricalDataDisplayType = request.HistoricalDataDisplayType,
-                ShowHistoricalInChart = request.ShowHistoricalInChart,
-                HistoricalPeriodCount = request.HistoricalPeriodCount,
-                Indicators = request.Indicators,
-                Filters = request.Filters,
-                Groups = request.Groups
+                ChartName = updateRequest.ChartName,
+                ChartType = updateRequest.ChartType,
+                Title = updateRequest.Title,
+                Subtitle = updateRequest.Subtitle,
+                Description = updateRequest.Description,
+                DisplayOrder = updateRequest.DisplayOrder,
+                IsActive = updateRequest.IsActive,
+                ShowHistoricalData = updateRequest.ShowHistoricalData,
+                HistoricalDataDisplayType = updateRequest.HistoricalDataDisplayType,
+                ShowHistoricalInChart = updateRequest.ShowHistoricalInChart,
+                HistoricalPeriodCount = updateRequest.HistoricalPeriodCount,
+                Indicators = updateRequest.Indicators,
+                Filters = updateRequest.Filters,
+                Groups = updateRequest.Groups
             };
 
             var result = await _mediator.Send(command);

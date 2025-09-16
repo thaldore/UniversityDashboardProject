@@ -282,61 +282,135 @@ const ChartDisplay = ({ chart }) => {
     };
 
     const formatGroupedChartData = (data) => {
-        // Gösterge sırasını koru
-        const indicators = (chartDetails.indicators || []).map(ind => ({
-            id: ind.indicatorId,
-            label: ind.label || ind.indicatorName || ind.indicatorCode,
-            fallbackColor: ind.color
-        }));
-        const labels = indicators.map(i => i.label);
-
-        // Her gösterge için değer al
-        const values = indicators.map(ind => {
-            const dataItem = data.currentData.find(item => item.additionalData?.IndicatorId === ind.id);
-            return dataItem ? dataItem.value : 0;
+        console.log('formatGroupedChartData - received data:', data.currentData);
+        
+        // Veriyi alt gruplara göre gruplandır
+        const groupedIndicators = {};
+        const ungroupedIndicators = [];
+        
+        data.currentData.forEach(item => {
+            const hasSubGroup = item.additionalData?.HasSubGroup;
+            const groupName = item.additionalData?.GroupName;
+            
+            if (hasSubGroup && groupName) {
+                // Alt grupta olan göstergeler
+                if (!groupedIndicators[groupName]) {
+                    groupedIndicators[groupName] = [];
+                }
+                groupedIndicators[groupName].push(item);
+            } else {
+                // Alt grupta olmayan göstergeler
+                ungroupedIndicators.push(item);
+            }
         });
-
-        // Grup renklerine göre bar renklendirme (sadece tek dataset)
-        const groupColorMap = new Map();
-        (chartDetails.groups || []).forEach(g => {
-            (g.indicators || []).forEach(gi => {
-                groupColorMap.set(gi.indicatorId, g.color);
+        
+        console.log('Grouped indicators:', groupedIndicators);
+        console.log('Ungrouped indicators:', ungroupedIndicators);
+        
+        // X ekseni label'larını oluştur
+        const labels = [];
+        
+        // Alt grup isimlerini ekle
+        Object.keys(groupedIndicators).forEach(groupName => {
+            labels.push(groupName);
+        });
+        
+        // Gruplanmamış gösterge isimlerini ekle
+        ungroupedIndicators.forEach(item => {
+            labels.push(item.label);
+        });
+        
+        console.log('X-axis labels:', labels);
+        
+        // Dataset'leri oluştur - her gösterge ayrı dataset olacak
+        const datasets = [];
+        const processedIndicators = new Set();
+        
+        // Alt gruplardaki göstergeleri işle
+        Object.values(groupedIndicators).forEach(groupItems => {
+            groupItems.forEach(item => {
+                if (!processedIndicators.has(item.additionalData?.IndicatorId)) {
+                    processedIndicators.add(item.additionalData?.IndicatorId);
+                    
+                    // Bu gösterge için tüm label'lardaki değerleri oluştur
+                    const dataValues = labels.map(label => {
+                        // Ana grup gizli mi kontrol et
+                        const parentGroupId = item.additionalData?.ParentGroupId;
+                        if (parentGroupId && hiddenGroups.includes(parentGroupId)) {
+                            return 0; // Ana grup gizli ise değer gösterme
+                        }
+                        
+                        // Bu label'da bu gösterge var mı?
+                        if (groupedIndicators[label] && groupedIndicators[label].some(gi => gi.additionalData?.IndicatorId === item.additionalData?.IndicatorId)) {
+                            const matchingItem = groupedIndicators[label].find(gi => gi.additionalData?.IndicatorId === item.additionalData?.IndicatorId);
+                            return matchingItem ? matchingItem.value : 0;
+                        } else if (ungroupedIndicators.some(ui => ui.label === label && ui.additionalData?.IndicatorId === item.additionalData?.IndicatorId)) {
+                            const matchingItem = ungroupedIndicators.find(ui => ui.label === label && ui.additionalData?.IndicatorId === item.additionalData?.IndicatorId);
+                            return matchingItem ? matchingItem.value : 0;
+                        }
+                        return 0; // Bu label'da bu gösterge yok
+                    });
+                    
+                    datasets.push({
+                        label: item.additionalData?.IndicatorName || item.label,
+                        data: dataValues,
+                        backgroundColor: item.color,
+                        borderColor: item.color,
+                        borderWidth: 1
+                    });
+                }
             });
         });
-
-        const backgroundColors = indicators.map(ind => {
-            const color = groupColorMap.get(ind.id) || ind.fallbackColor || CHART_COLORS[indicators.indexOf(ind) % CHART_COLORS.length];
-            // Eğer gösterge ait olduğu grup gizlendiyse şeffaf yap
-            const owningGroup = (chartDetails.groups || []).find(g => (g.indicators || []).some(gi => gi.indicatorId === ind.id));
-            if (owningGroup && hiddenGroups.includes(owningGroup.groupId)) {
-                return 'rgba(0,0,0,0)';
+        
+        // Gruplanmamış göstergeleri işle
+        ungroupedIndicators.forEach(item => {
+            if (!processedIndicators.has(item.additionalData?.IndicatorId)) {
+                processedIndicators.add(item.additionalData?.IndicatorId);
+                
+                // Ana grup gizli mi kontrol et
+                const parentGroupId = item.additionalData?.ParentGroupId;
+                const isHidden = parentGroupId && hiddenGroups.includes(parentGroupId);
+                
+                const dataValues = labels.map(label => {
+                    if (isHidden) {
+                        return 0; // Ana grup gizli ise değer gösterme
+                    }
+                    return label === item.label ? item.value : 0;
+                });
+                
+                datasets.push({
+                    label: item.additionalData?.IndicatorName || item.label,
+                    data: dataValues,
+                    backgroundColor: item.color,
+                    borderColor: item.color,
+                    borderWidth: 1
+                });
             }
-            return color;
         });
-
-        const dataValues = values.map((v, idx) => {
-            const indicatorId = indicators[idx].id;
-            const owningGroup = (chartDetails.groups || []).find(g => (g.indicators || []).some(gi => gi.indicatorId === indicatorId));
-            if (owningGroup && hiddenGroups.includes(owningGroup.groupId)) {
-                return null; // gizlenmiş grup => değer yok
-            }
-            return v;
-        });
+        
+        console.log('formatGroupedChartData - result:', { labels, datasets });
 
         return {
             labels,
-            datasets: [
-                {
-                    label: chartDetails.title || 'Veri',
-                    data: dataValues,
-                    backgroundColor: backgroundColors,
-                    borderColor: backgroundColors,
-                    borderWidth: 1,
-                    categoryPercentage: 0.8,
-                    barPercentage: 0.8
-                }
-            ]
+            datasets
         };
+    };
+
+    // Göstergenin hangi gruba ait olduğunu bul (hiyerarşik arama)
+    const findOwningGroup = (groups, indicatorId) => {
+        for (const group of groups) {
+            // Direkt bu grupta mı?
+            if ((group.indicators || []).some(gi => gi.indicatorId === indicatorId)) {
+                return group;
+            }
+            
+            // Alt gruplarda mı?
+            if (group.childGroups && group.childGroups.length > 0) {
+                const foundInChild = findOwningGroup(group.childGroups, indicatorId);
+                if (foundInChild) return foundInChild;
+            }
+        }
+        return null;
     };
 
     const getChartOptions = () => {
@@ -375,7 +449,7 @@ const ChartDisplay = ({ chart }) => {
             }
         };
 
-        // Gruplandırılmış tek dataset durumunda legend'ı grupları gösterecek şekilde manuel oluştur
+        // Gruplandırılmış tek dataset durumunda legend'ı ana grupları gösterecek şekilde oluştur
         if (chartDetails.groups && chartDetails.groups.length > 0) {
             baseOptions.plugins.legend = {
                 display: true,
@@ -387,20 +461,27 @@ const ChartDisplay = ({ chart }) => {
                 labels: {
                     usePointStyle: true,
                     pointStyle: 'circle',
-                    color: '#555', // tutarlı açık siyah/gri ton
+                    color: '#555',
                     generateLabels: () => {
-                        return (chartDetails.groups || []).map(g => {
-                            const hidden = hiddenGroups.includes(g.groupId);
-                            return {
-                                text: g.groupName,
-                                fillStyle: g.color,
-                                strokeStyle: g.color,
+                        const legendItems = [];
+                        
+                        // Sadece ana grupları (ColorGroup) legend'da göster
+                        const mainGroups = (chartDetails.groups || []).filter(group => group.groupType === 1); // ColorGroup
+                        
+                        mainGroups.forEach(group => {
+                            const hidden = hiddenGroups.includes(group.groupId);
+                            legendItems.push({
+                                text: group.groupName,
+                                fillStyle: group.color,
+                                strokeStyle: group.color,
                                 hidden,
                                 lineWidth: 1,
                                 pointStyle: 'circle',
-                                __groupId: g.groupId
-                            };
+                                __groupId: group.groupId
+                            });
                         });
+                        
+                        return legendItems;
                     }
                 }
             };

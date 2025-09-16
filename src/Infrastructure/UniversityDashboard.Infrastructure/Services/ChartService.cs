@@ -508,6 +508,9 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     .ThenInclude(cf => cf.ChartFilterIndicators)
                 .Include(c => c.ChartGroups)
                     .ThenInclude(cg => cg.ChartGroupIndicators)
+                        .ThenInclude(cgi => cgi.Indicator)
+                .Include(c => c.ChartGroups)
+                    .ThenInclude(cg => cg.ParentGroup)
                 .FirstOrDefaultAsync(c => c.ChartId == request.ChartId && c.IsActive);
 
             if (chart == null)
@@ -535,95 +538,18 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 }
             }
 
-            // Build current data
-            foreach (var chartIndicator in indicatorsToShow.OrderBy(ci => ci.DisplayOrder))
+            // Build current data with grouping support
+            var hasSubGroups = chart.ChartGroups.Any(g => g.GroupType == GroupType.NameGroup);
+            
+            if (hasSubGroups)
             {
-                // ShowHistoricalInChart true ise geçmiş dönemleri de dahil et
-                if (chart.ShowHistoricalInChart && chart.HistoricalPeriodCount.HasValue)
-                {
-                    // Geçmiş dönemler dahil olmak üzere veri topla
-                    var historicalPeriodCount = chart.HistoricalPeriodCount.Value;
-                    
-                    // Son N dönemin verilerini getir
-                    var historicalData = chartIndicator.Indicator.Data
-                        .Where(d => d.Status == DataStatus.Approved)
-                        .OrderByDescending(d => d.Year)
-                        .ThenByDescending(d => d.Period)
-                        .Take(historicalPeriodCount)
-                        .OrderBy(d => d.Year)
-                        .ThenBy(d => d.Period)
-                        .ToList();
-
-                    // Her dönem için ayrı data point oluştur
-                    for (int i = 0; i < historicalData.Count; i++)
-                    {
-                        var data = historicalData[i];
-                        string periodLabel;
-                        
-                        if (i == historicalData.Count - 1)
-                        {
-                            periodLabel = "Güncel Dönem";
-                        }
-                        else
-                        {
-                            var periodsBack = historicalData.Count - 1 - i;
-                            periodLabel = $"Geçmiş {periodsBack}. Dönem";
-                        }
-
-                        response.CurrentData.Add(new ChartDataDto
-                        {
-                            Label = $"{chartIndicator.Label ?? chartIndicator.Indicator.IndicatorName} - {periodLabel}",
-                            Value = data.Value ?? 0,
-                            Color = chartIndicator.Color,
-                            Unit = chartIndicator.Indicator.DataType.ToString(),
-                            AdditionalData = new Dictionary<string, object>
-                            {
-                                { "IndicatorCode", chartIndicator.Indicator.IndicatorCode },
-                                { "IndicatorId", chartIndicator.IndicatorId },
-                                { "Year", data.Year },
-                                { "Period", data.Period },
-                                { "PeriodLabel", periodLabel },
-                                { "IsHistorical", i < historicalData.Count - 1 }
-                            }
-                        });
-                    }
-                }
-                else
-                {
-                    // Sadece güncel dönem verisi
-                    // Try to get latest data for the specified year and period first
-                    var latestData = chartIndicator.Indicator.Data
-                        .Where(d => d.Year == request.Year && d.Period == request.Period && d.Status == DataStatus.Approved)
-                        .FirstOrDefault();
-
-                    // If no data found for specific year/period, try to get the most recent approved data
-                    if (latestData == null)
-                    {
-                        latestData = chartIndicator.Indicator.Data
-                            .Where(d => d.Status == DataStatus.Approved)
-                            .OrderByDescending(d => d.Year)
-                            .ThenByDescending(d => d.Period)
-                            .FirstOrDefault();
-                    }
-
-                    if (latestData != null)
-                    {
-                        response.CurrentData.Add(new ChartDataDto
-                        {
-                            Label = chartIndicator.Label ?? chartIndicator.Indicator.IndicatorName,
-                            Value = latestData.Value ?? 0,
-                            Color = chartIndicator.Color,
-                            Unit = chartIndicator.Indicator.DataType.ToString(),
-                            AdditionalData = new Dictionary<string, object>
-                            {
-                                { "IndicatorCode", chartIndicator.Indicator.IndicatorCode },
-                                { "IndicatorId", chartIndicator.IndicatorId },
-                                { "Year", latestData.Year },
-                                { "Period", latestData.Period }
-                            }
-                        });
-                    }
-                }
+                // Alt gruplar varsa, gösterge isimlerini koru ancak gruplandırma metadata'sı ekle
+                BuildGroupedChartData(chart, indicatorsToShow, request, response);
+            }
+            else
+            {
+                // Alt grup yoksa standart chart data oluştur
+                BuildStandardChartData(indicatorsToShow, request, response, chart);
             }
 
             // Calculate percentages for pie charts
@@ -696,6 +622,97 @@ namespace UniversityDashBoardProject.Infrastructure.Services
         #endregion
 
         #region Utility Methods
+
+        private void BuildGroupedChartData(Chart chart, IQueryable<ChartIndicator> indicatorsToShow, ChartDataRequest request, ChartDataResponseDto response)
+        {
+            var subGroups = chart.ChartGroups.Where(g => g.GroupType == GroupType.NameGroup).OrderBy(g => g.DisplayOrder).ToList();
+            var mainGroups = chart.ChartGroups.Where(g => g.GroupType == GroupType.ColorGroup).ToList();
+            
+            // Tüm göstergeleri işle - gösterge isimlerini koru
+            foreach (var chartIndicator in indicatorsToShow.OrderBy(ci => ci.DisplayOrder))
+            {
+                var indicatorData = GetIndicatorData(chartIndicator, request);
+                if (indicatorData != null)
+                {
+                    // Bu göstergenin hangi alt grupta olduğunu bul
+                    var subGroup = subGroups.FirstOrDefault(sg => 
+                        sg.ChartGroupIndicators.Any(cgi => cgi.IndicatorId == chartIndicator.IndicatorId));
+                    
+                    // Ana grubun rengini al
+                    var parentGroup = mainGroups.FirstOrDefault(mg => 
+                        mg.ChartGroupIndicators.Any(cgi => cgi.IndicatorId == chartIndicator.IndicatorId) ||
+                        (subGroup != null && mg.GroupId == subGroup.ParentGroupId));
+                    
+                    var color = parentGroup?.Color ?? chartIndicator.Color ?? "#3b82f6";
+                    
+                    response.CurrentData.Add(new ChartDataDto
+                    {
+                        Label = chartIndicator.Label ?? chartIndicator.Indicator.IndicatorName, // Gösterge ismi korunur
+                        Value = indicatorData.Value ?? 0,
+                        Color = color,
+                        Unit = chartIndicator.Indicator.DataType.ToString(),
+                        AdditionalData = new Dictionary<string, object>
+                        {
+                            { "IndicatorCode", chartIndicator.Indicator.IndicatorCode },
+                            { "IndicatorId", chartIndicator.IndicatorId },
+                            { "IndicatorName", chartIndicator.Label ?? chartIndicator.Indicator.IndicatorName },
+                            { "GroupName", subGroup?.GroupName ?? "" }, // Alt grup varsa ismini ekle
+                            { "GroupId", subGroup?.GroupId ?? 0 },
+                            { "ParentGroupId", subGroup?.ParentGroupId ?? parentGroup?.GroupId ?? 0 },
+                            { "ParentGroupName", parentGroup?.GroupName ?? "" },
+                            { "Year", indicatorData.Year },
+                            { "Period", indicatorData.Period },
+                            { "HasSubGroup", subGroup != null } // Alt grupta olup olmadığını belirt
+                        }
+                    });
+                }
+            }
+        }
+
+        private void BuildStandardChartData(IQueryable<ChartIndicator> indicatorsToShow, ChartDataRequest request, ChartDataResponseDto response, Chart chart)
+        {
+            foreach (var chartIndicator in indicatorsToShow.OrderBy(ci => ci.DisplayOrder))
+            {
+                var indicatorData = GetIndicatorData(chartIndicator, request);
+                if (indicatorData != null)
+                {
+                    response.CurrentData.Add(new ChartDataDto
+                    {
+                        Label = chartIndicator.Label ?? chartIndicator.Indicator.IndicatorName,
+                        Value = indicatorData.Value ?? 0,
+                        Color = chartIndicator.Color,
+                        Unit = chartIndicator.Indicator.DataType.ToString(),
+                        AdditionalData = new Dictionary<string, object>
+                        {
+                            { "IndicatorCode", chartIndicator.Indicator.IndicatorCode },
+                            { "IndicatorId", chartIndicator.IndicatorId },
+                            { "Year", indicatorData.Year },
+                            { "Period", indicatorData.Period }
+                        }
+                    });
+                }
+            }
+        }
+
+        private IndicatorData? GetIndicatorData(ChartIndicator chartIndicator, ChartDataRequest request)
+        {
+            // Try to get latest data for the specified year and period first
+            var latestData = chartIndicator.Indicator.Data
+                .Where(d => d.Year == request.Year && d.Period == request.Period && d.Status == DataStatus.Approved)
+                .FirstOrDefault();
+
+            // If no data found for specific year/period, try to get the most recent approved data
+            if (latestData == null)
+            {
+                latestData = chartIndicator.Indicator.Data
+                    .Where(d => d.Status == DataStatus.Approved)
+                    .OrderByDescending(d => d.Year)
+                    .ThenByDescending(d => d.Period)
+                    .FirstOrDefault();
+            }
+
+            return latestData;
+        }
 
         public async Task<List<string>> GetSupportedChartTypesAsync()
         {

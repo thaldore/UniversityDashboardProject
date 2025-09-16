@@ -22,6 +22,12 @@ export const FilterType = {
     Multiple: 2
 };
 
+// Group Types
+export const GroupType = {
+    ColorGroup: 1,  // Ana grup - Renk gruplandırması (Örn: Ulusal Dergi Yayın Grubu)
+    NameGroup: 2    // Alt grup - İsim gruplandırması (Örn: Tıp Fakültesi)
+};
+
 // Chart constants
 export const CHART_COLORS = [
     '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
@@ -68,6 +74,17 @@ export const getFilterTypeText = (type) => {
             return 'Tekli Seçim';
         case FilterType.Multiple:
             return 'Çoklu Seçim';
+        default:
+            return 'Bilinmeyen';
+    }
+};
+
+export const getGroupTypeText = (type) => {
+    switch (type) {
+        case GroupType.ColorGroup:
+            return 'Ana Grup (Renk)';
+        case GroupType.NameGroup:
+            return 'Alt Grup (İsim)';
         default:
             return 'Bilinmeyen';
     }

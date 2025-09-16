@@ -274,11 +274,20 @@ namespace UniversityDashBoardProject.Infrastructure.Persistence
                     
                 entity.Property(cg => cg.Color)
                     .HasMaxLength(7);
+                    
+                entity.Property(cg => cg.GroupType)
+                    .HasConversion<string>();
                 
                 entity.HasOne(cg => cg.Chart)
                     .WithMany(c => c.ChartGroups)
                     .HasForeignKey(cg => cg.ChartId)
                     .OnDelete(DeleteBehavior.Cascade);
+                    
+                // Grup hiyerarşisi için self-referencing relationship
+                entity.HasOne(cg => cg.ParentGroup)
+                    .WithMany(cg => cg.ChildGroups)
+                    .HasForeignKey(cg => cg.ParentGroupId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // ChartFilterIndicator configuration

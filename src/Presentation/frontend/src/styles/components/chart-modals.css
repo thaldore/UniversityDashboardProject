@@ -730,3 +730,114 @@
         align-self: flex-start;
     }
 }
+
+/* Group Hierarchy Styles */
+.group-hierarchy {
+    margin-bottom: 2rem;
+    border: 1px solid var(--secondary-200);
+    border-radius: 8px;
+    overflow: hidden;
+    background: white;
+}
+
+.main-group-item {
+    background: var(--primary-50);
+    border-bottom: 2px solid var(--primary-200);
+    padding: 1.5rem;
+}
+
+.sub-group-item {
+    background: var(--secondary-25);
+    border-bottom: 1px solid var(--secondary-200);
+    padding: 1rem 1.5rem;
+    margin-left: 2rem;
+    position: relative;
+}
+
+.sub-group-item:before {
+    content: '';
+    position: absolute;
+    left: -2rem;
+    top: 0;
+    bottom: 0;
+    width: 2rem;
+    border-left: 2px solid var(--secondary-300);
+    border-bottom: 2px solid var(--secondary-300);
+    border-bottom-left-radius: 8px;
+}
+
+.sub-group-item:last-child:before {
+    border-bottom: none;
+    height: 50%;
+}
+
+.sub-group-indicator {
+    color: var(--secondary-500);
+    font-weight: bold;
+    margin-right: 0.5rem;
+    font-family: monospace;
+}
+
+.add-subgroup-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--primary-200);
+}
+
+.add-subgroup-btn {
+    background: var(--secondary-100);
+    color: var(--secondary-700);
+    border: 1px dashed var(--secondary-400);
+}
+
+.add-subgroup-btn:hover {
+    background: var(--secondary-200);
+    border-style: solid;
+}
+
+.sub-group-indicators {
+    margin-left: 1rem;
+    padding-left: 1rem;
+    border-left: 2px solid var(--secondary-300);
+}
+
+.no-groups-info {
+    background: var(--secondary-50);
+    border: 1px solid var(--secondary-200);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    color: var(--secondary-600);
+}
+
+.no-groups-info h4 {
+    color: var(--primary-700);
+    margin-bottom: 1rem;
+}
+
+.no-groups-info ul {
+    text-align: left;
+    max-width: 400px;
+    margin: 1rem auto 0;
+}
+
+.no-groups-info li {
+    margin-bottom: 0.5rem;
+}
+
+/* Responsive adjustments for group hierarchy */
+@media (max-width: 768px) {
+    .sub-group-item {
+        margin-left: 1rem;
+    }
+    
+    .sub-group-item:before {
+        left: -1rem;
+        width: 1rem;
+    }
+    
+    .sub-group-indicators {
+        margin-left: 0.5rem;
+        padding-left: 0.5rem;
+    }
+}

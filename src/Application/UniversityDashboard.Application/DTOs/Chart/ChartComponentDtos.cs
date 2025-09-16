@@ -33,7 +33,11 @@ namespace UniversityDashBoardProject.Application.DTOs.Chart
         public string? Description { get; set; }
         public int DisplayOrder { get; set; }
         public string? Color { get; set; }
+        public GroupType GroupType { get; set; }
+        public int? ParentGroupId { get; set; }
+        public string? ParentGroupName { get; set; }
         public List<ChartIndicatorDto> Indicators { get; set; } = new();
+        public List<ChartGroupDto> ChildGroups { get; set; } = new();
     }
 
     public class ChartDataDto
