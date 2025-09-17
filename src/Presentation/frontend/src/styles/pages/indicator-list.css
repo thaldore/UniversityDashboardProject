@@ -158,13 +158,23 @@
     overflow: hidden;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     border: 1px solid rgba(226, 232, 240, 0.8);
+    width: 100%;
+}
+
+.indicators-table-container.scrollable {
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: none;
+    white-space: nowrap;
 }
 
 /* Tablo */
 .indicators-table {
     width: 100%;
+    min-width: 1000px; /* Minimum width to ensure all columns are visible */
     border-collapse: collapse;
     font-size: 0.95rem;
+    position: relative;
 }
 
 .indicators-table th {
@@ -177,6 +187,38 @@
     font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    position: relative;
+}
+
+/* Sticky Actions Column */
+.indicators-table th:last-child,
+.indicators-table td:last-child {
+    position: sticky;
+    right: 0;
+    background: white;
+    z-index: 20;
+    border-left: 1px solid #e5e7eb;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+    min-width: 120px;
+    width: 120px;
+    padding: 1.25rem 0.75rem;
+}
+
+.indicators-table th:last-child {
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border-left: 1px solid #e5e7eb;
+    z-index: 21;
+}
+
+/* Ensure sticky column maintains background on hover */
+.indicators-table tr:hover td:last-child {
+    background: rgba(59, 130, 246, 0.02);
+    z-index: 20;
+}
+
+.indicators-table tr.inactive-row:hover td:last-child {
+    background: rgba(239, 68, 68, 0.02);
+    z-index: 20;
 }
 
 .indicators-table td {
@@ -189,11 +231,19 @@
     background: rgba(59, 130, 246, 0.02);
 }
 
+.indicators-table tr:hover td:last-child {
+    background: rgba(59, 130, 246, 0.02);
+}
+
 .indicators-table tr.inactive-row {
     opacity: 0.6;
 }
 
 .indicators-table tr.inactive-row:hover {
+    background: rgba(239, 68, 68, 0.02);
+}
+
+.indicators-table tr.inactive-row:hover td:last-child {
     background: rgba(239, 68, 68, 0.02);
 }
 
@@ -207,6 +257,17 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.025em;
+}
+
+.status-badge.clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.status-badge.clickable:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .status-active {
@@ -280,13 +341,34 @@
     white-space: nowrap;
 }
 
-.root-value-more {
+.root-value-tag.small {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.4rem;
+}
+
+.root-value-more,
+.root-value-toggle {
     color: #6b7280;
     font-size: 0.75rem;
     font-weight: 500;
     padding: 0.25rem 0.5rem;
     background: #f3f4f6;
     border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.root-value-more.small,
+.root-value-toggle.small {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.4rem;
+}
+
+.root-value-more:hover,
+.root-value-toggle:hover {
+    background: #e5e7eb;
+    color: #374151;
 }
 
 /* Atanan Kullanıcı */
@@ -304,47 +386,75 @@
 /* İşlemler - Inline Butonlar */
 .actions-inline {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     justify-content: center;
     align-items: center;
+    padding: 0.5rem;
+    background: inherit;
+    position: relative;
+    z-index: 25;
 }
 
 .action-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border: none;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s ease;
-    background: transparent;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(2px);
+    position: relative;
+    z-index: 26;
 }
 
 .action-btn svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
+    position: relative;
+    z-index: 27;
 }
 
 .edit-btn {
     color: #10b981;
     background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .edit-btn:hover {
-    background: rgba(16, 185, 129, 0.2);
+    background: rgba(16, 185, 129, 0.8);
+    color: white;
     transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
 }
 
 .delete-btn {
     color: #ef4444;
     background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .delete-btn:hover {
-    background: rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.8);
+    color: white;
     transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+}
+
+.permanent-delete-btn {
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.1);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+.permanent-delete-btn:hover {
+    background: rgba(220, 38, 38, 0.9);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.4);
 }
 
 /* Boş Durum */

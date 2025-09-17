@@ -26,6 +26,9 @@ const DataEntryPage = () => {
         dataItems: [],
         generalNotes: ''
     });
+    
+    // State for expandable rows
+    const [expandedRows, setExpandedRows] = useState(new Set());
 
     useEffect(() => {
         loadDataEntryForm();
@@ -88,6 +91,18 @@ const DataEntryPage = () => {
             ...prev,
             generalNotes: value
         }));
+    };
+
+    const toggleRowExpansion = (indicatorId) => {
+        setExpandedRows(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(indicatorId)) {
+                newSet.delete(indicatorId);
+            } else {
+                newSet.add(indicatorId);
+            }
+            return newSet;
+        });
     };
 
     const validateForm = () => {
@@ -260,14 +275,27 @@ const DataEntryPage = () => {
                                                 <span className="indicator-code">{indicator.indicatorCode}</span>
                                             </td>
                                             <td>
-                                                <div className="indicator-name-cell">
-                                                    <span className="indicator-name">{indicator.indicatorName}</span>
+                                                <div 
+                                                    className={`indicator-name-cell ${expandedRows.has(indicator.indicatorId) ? 'expanded' : ''}`}
+                                                    onClick={() => toggleRowExpansion(indicator.indicatorId)}
+                                                >
+                                                    <span className="indicator-name">
+                                                        {indicator.indicatorName}
+                                                    </span>
+                                                    <button className="expand-indicator-btn" type="button">
+                                                        {expandedRows.has(indicator.indicatorId) ? '−' : '+'}
+                                                    </button>
                                                 </div>
                                             </td>
                                             <td>
-                                                <span className="indicator-description">
-                                                    {indicator.description || '-'}
-                                                </span>
+                                                <div 
+                                                    className={`indicator-description-cell ${expandedRows.has(indicator.indicatorId) ? 'expanded' : ''}`}
+                                                    onClick={() => toggleRowExpansion(indicator.indicatorId)}
+                                                >
+                                                    <span className="indicator-description">
+                                                        {indicator.description || '-'}
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td>
                                                 <div className="automatic-indicator">
@@ -283,14 +311,14 @@ const DataEntryPage = () => {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td>
+                                            <td className="value-column">
                                                 <div className="value-input-container">
                                                     <input
                                                         type="number"
                                                         step="0.01"
                                                         value={dataItem?.value || ''}
                                                         onChange={(e) => handleDataItemChange(indicator.indicatorId, 'value', e.target.value)}
-                                                        className="value-input"
+                                                        className="value-input enlarged"
                                                         disabled={indicator.isAutomatic || loading}
                                                         placeholder="Değer girin"
                                                     />

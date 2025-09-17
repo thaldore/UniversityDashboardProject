@@ -38,4 +38,9 @@ namespace UniversityDashBoardProject.Application.DTOs.Indicator
     {
         // UpdateIndicatorRequest, CreateIndicatorRequest ile aynı alanları kullanıyor
     }
+    
+    public class ToggleStatusRequest
+    {
+        public bool IsActive { get; set; }
+    }
 }

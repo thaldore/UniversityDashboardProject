@@ -208,6 +208,19 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             return true;
         }
 
+        public async Task<bool> ToggleIndicatorStatusAsync(int id, bool isActive)
+        {
+            var indicator = await _context.Indicators
+                .FirstOrDefaultAsync(i => i.IndicatorId == id);
+
+            if (indicator == null)
+                return false;
+
+            indicator.IsActive = isActive;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
         public async Task<bool> DeleteIndicatorAsync(int id)
         {
             var indicator = await _context.Indicators
@@ -218,6 +231,29 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
             // Soft delete - göstergeyi pasif yap
             indicator.IsActive = false;
+            
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> PermanentDeleteIndicatorAsync(int id)
+        {
+            var indicator = await _context.Indicators
+                .Include(i => i.RootValues)
+                .Include(i => i.HistoricalData)
+                .Include(i => i.Data)
+                .FirstOrDefaultAsync(i => i.IndicatorId == id);
+
+            if (indicator == null)
+                return false;
+
+            // İlişkili verileri sil
+            _context.IndicatorRootValues.RemoveRange(indicator.RootValues);
+            _context.IndicatorHistoricalData.RemoveRange(indicator.HistoricalData);
+            _context.IndicatorData.RemoveRange(indicator.Data);
+            
+            // Göstergeyi tamamen sil
+            _context.Indicators.Remove(indicator);
             
             await _context.SaveChangesAsync();
             return true;

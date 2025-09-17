@@ -112,6 +112,29 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
         }
 
         /// <summary>
+        /// Gösterge durumunu değiştirir (Sadece Admin)
+        /// </summary>
+        [HttpPatch("{id}/status")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ToggleIndicatorStatus(int id, [FromBody] ToggleStatusRequest request)
+        {
+            try
+            {
+                var command = new ToggleIndicatorStatusCommand { Id = id, IsActive = request.IsActive };
+                var result = await _mediator.Send(command);
+                
+                if (!result)
+                    return NotFound(new { Message = "Gösterge bulunamadı." });
+                
+                return Ok(new { Message = "Gösterge durumu başarıyla güncellendi." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = "Gösterge durumu güncellenirken hata oluştu.", Error = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Göstergeyi siler (pasif yapar) (Sadece Admin)
         /// </summary>
         [HttpDelete("{id}")]
@@ -127,6 +150,29 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
                     return NotFound(new { Message = "Gösterge bulunamadı." });
                 
                 return Ok(new { Message = "Gösterge başarıyla silindi." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { Message = "Gösterge silinirken hata oluştu.", Error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Göstergeyi kalıcı olarak siler (Sadece Admin)
+        /// </summary>
+        [HttpDelete("{id}/permanent")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> PermanentDeleteIndicator(int id)
+        {
+            try
+            {
+                var command = new PermanentDeleteIndicatorCommand { Id = id };
+                var result = await _mediator.Send(command);
+                
+                if (!result)
+                    return NotFound(new { Message = "Gösterge bulunamadı." });
+                
+                return Ok(new { Message = "Gösterge kalıcı olarak silindi." });
             }
             catch (Exception ex)
             {

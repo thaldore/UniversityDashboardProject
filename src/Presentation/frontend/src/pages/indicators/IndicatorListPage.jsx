@@ -13,6 +13,7 @@ const IndicatorListPage = () => {
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
+    const [expandedRootValues, setExpandedRootValues] = useState(new Set());
 
     useEffect(() => {
         loadIndicators();
@@ -32,15 +33,62 @@ const IndicatorListPage = () => {
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('Bu göstergeyi silmek istediğinizden emin misiniz?')) {
+        const indicator = indicators.find(ind => ind.indicatorId === id);
+        
+        if (!indicator) return;
+        
+        const isActive = indicator.isActive;
+        const confirmMessage = isActive 
+            ? 'Bu göstergeyi pasif duruma getirmek istediğinizden emin misiniz?'
+            : 'Bu göstergeyi kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!';
+            
+        if (window.confirm(confirmMessage)) {
             try {
-                await indicatorService.deleteIndicator(id);
-                await loadIndicators();
+                if (isActive) {
+                    // Aktif göstergeyi soft delete yap (pasif yap)
+                    await indicatorService.deleteIndicator(id);
+                    setIndicators(prev => prev.map(indicator => 
+                        indicator.indicatorId === id 
+                            ? { ...indicator, isActive: false }
+                            : indicator
+                    ));
+                } else {
+                    // Pasif göstergeyi kalıcı olarak sil
+                    await indicatorService.permanentDeleteIndicator(id);
+                    setIndicators(prev => prev.filter(indicator => indicator.indicatorId !== id));
+                }
             } catch (error) {
                 setError('Gösterge silinirken hata oluştu.');
                 console.error('Error deleting indicator:', error);
             }
         }
+    };
+
+    const toggleStatus = async (indicator) => {
+        try {
+            await indicatorService.toggleIndicatorStatus(indicator.indicatorId, !indicator.isActive);
+            // Update status in state immediately
+            setIndicators(prev => prev.map(ind => 
+                ind.indicatorId === indicator.indicatorId 
+                    ? { ...ind, isActive: !indicator.isActive }
+                    : ind
+            ));
+        } catch (error) {
+            setError('Gösterge durumu güncellenirken hata oluştu.');
+            console.error('Error updating indicator status:', error);
+        }
+    };
+
+    const toggleRootValuesExpansion = (indicatorId) => {
+        setExpandedRootValues(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(indicatorId)) {
+                newSet.delete(indicatorId);
+            } else {
+                newSet.add(indicatorId);
+            }
+            return newSet;
+        });
     };
 
     const filteredIndicators = indicators.filter(indicator => {
@@ -112,7 +160,7 @@ const IndicatorListPage = () => {
                 </div>
             </div>
 
-            <div className="indicators-table-container">
+            <div className="indicators-table-container scrollable">
                 <table className="indicators-table">
                     <thead>
                         <tr>
@@ -131,7 +179,11 @@ const IndicatorListPage = () => {
                         {filteredIndicators.map((indicator) => (
                             <tr key={indicator.indicatorId} className={!indicator.isActive ? 'inactive-row' : ''}>
                                 <td>
-                                    <span className={`status-badge ${indicator.isActive ? 'status-active' : 'status-inactive'}`}>
+                                    <span 
+                                        className={`status-badge clickable ${indicator.isActive ? 'status-active' : 'status-inactive'}`}
+                                        onClick={() => toggleStatus(indicator)}
+                                        title="Durumu değiştirmek için tıklayın"
+                                    >
                                         {indicator.isActive ? 'Aktif' : 'Pasif'}
                                     </span>
                                 </td>
@@ -151,11 +203,36 @@ const IndicatorListPage = () => {
                                 </td>
                                 <td>
                                     <div className="root-values">
-                                        {indicator.rootValues.slice(0, 2).map((value, index) => (
-                                            <span key={index} className="root-value-tag">{value}</span>
-                                        ))}
-                                        {indicator.rootValues.length > 2 && (
-                                            <span className="root-value-more">+{indicator.rootValues.length - 2} daha</span>
+                                        {expandedRootValues.has(indicator.indicatorId) ? (
+                                            // Show all root values when expanded
+                                            <>
+                                                {indicator.rootValues.map((value, index) => (
+                                                    <span key={index} className="root-value-tag small">{value}</span>
+                                                ))}
+                                                {indicator.rootValues.length > 2 && (
+                                                    <button 
+                                                        className="root-value-toggle small"
+                                                        onClick={() => toggleRootValuesExpansion(indicator.indicatorId)}
+                                                    >
+                                                        Daralt
+                                                    </button>
+                                                )}
+                                            </>
+                                        ) : (
+                                            // Show limited root values
+                                            <>
+                                                {indicator.rootValues.slice(0, 2).map((value, index) => (
+                                                    <span key={index} className="root-value-tag small">{value}</span>
+                                                ))}
+                                                {indicator.rootValues.length > 2 && (
+                                                    <button 
+                                                        className="root-value-more small"
+                                                        onClick={() => toggleRootValuesExpansion(indicator.indicatorId)}
+                                                    >
+                                                        +{indicator.rootValues.length - 2} daha
+                                                    </button>
+                                                )}
+                                            </>
                                         )}
                                     </div>
                                 </td>
@@ -177,13 +254,19 @@ const IndicatorListPage = () => {
                                             </svg>
                                         </button>
                                         <button 
-                                            className="action-btn delete-btn"
+                                            className={`action-btn ${indicator.isActive ? 'delete-btn' : 'permanent-delete-btn'}`}
                                             onClick={() => handleDelete(indicator.indicatorId)}
-                                            title="Sil"
+                                            title={indicator.isActive ? "Pasife Al" : "Kalıcı Sil"}
                                         >
-                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
+                                            {indicator.isActive ? (
+                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18 12M6 6l12 12" />
+                                                </svg>
+                                            ) : (
+                                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            )}
                                         </button>
                                     </div>
                                 </td>

@@ -6,7 +6,9 @@ namespace UniversityDashBoardProject.Application.Interfaces
     {
         Task<int> CreateIndicatorAsync(CreateIndicatorRequest request, int createdBy);
         Task<bool> UpdateIndicatorAsync(int id, UpdateIndicatorRequest request);
+        Task<bool> ToggleIndicatorStatusAsync(int id, bool isActive);
         Task<bool> DeleteIndicatorAsync(int id);
+        Task<bool> PermanentDeleteIndicatorAsync(int id);
         Task<IndicatorDetailDto?> GetIndicatorByIdAsync(int id);
         Task<List<IndicatorListDto>> GetIndicatorListAsync();
         Task<List<IndicatorDataEntryDto>> GetUserIndicatorsForDataEntryAsync(int userId, int year, int period);

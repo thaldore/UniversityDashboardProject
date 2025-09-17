@@ -83,6 +83,10 @@ class ApiClient {
     return this.client.put(endpoint, data);
   }
 
+  patch(endpoint, data) {
+    return this.client.patch(endpoint, data);
+  }
+
   delete(endpoint) {
     return this.client.delete(endpoint);
   }

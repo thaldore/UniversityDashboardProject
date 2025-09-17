@@ -25,9 +25,21 @@ const indicatorService = {
         return response.data;
     },
 
+    // Gösterge durumu değiştir
+    toggleIndicatorStatus: async (id, isActive) => {
+        const response = await apiClient.patch(`/indicator/${id}/status`, { isActive });
+        return response.data;
+    },
+
     // Gösterge sil
     deleteIndicator: async (id) => {
         const response = await apiClient.delete(`/indicator/${id}`);
+        return response.data;
+    },
+
+    // Göstergeyi kalıcı olarak sil
+    permanentDeleteIndicator: async (id) => {
+        const response = await apiClient.delete(`/indicator/${id}/permanent`);
         return response.data;
     },
 
