@@ -396,12 +396,18 @@ export default function Chart3D({ data, options = {}, legendItems, groupLabels }
     const chartWidth = Math.min(30, Math.max(8, labelCount * baseBarGap + 1));
     const chartDepth = 3; // önden görünümün korunduğu derinlik
     const chartHeight = 4; // sabit yükseklik (normalize ile dolduruluyor)
-    const gridXCount = Math.min(10, Math.max(6, labelCount));
+    
+    // Grid sayısını label sayısına göre dinamik ayarla
+    // Az label varsa daha az grid çizgisi, çok label varsa daha fazla
+    const gridXCount = Math.max(2, Math.min(labelCount + 2, 12)); // Minimum 2, maksimum 12 grid çizgisi
     const gridZCount = 3;
         
         console.log('Chart3D maxValue:', maxValue);
         console.log('Chart3D datasets:', data.datasets);
         console.log('Chart3D labels:', data.labels);
+        console.log('Chart3D labelCount:', labelCount);
+        console.log('Chart3D chartWidth:', chartWidth);
+        console.log('Chart3D gridXCount:', gridXCount);
         
         // Her label için kaç aktif dataset olduğunu hesapla
         const activeDatasetsPerLabel = data.labels.map((_, labelIndex) => {
@@ -421,8 +427,15 @@ export default function Chart3D({ data, options = {}, legendItems, groupLabels }
                     return;
                 }
                 
-                // Dataset'in kendi rengi varsa onu kullan, yoksa default'tan al
-                const color = dataset.backgroundColor || defaultColors[datasetIndex % defaultColors.length];
+                // Renk belirleme: Array formatında backgroundColor varsa kullan
+                let color;
+                if (Array.isArray(dataset.backgroundColor)) {
+                    // Her bar için ayrı renk array'i
+                    color = dataset.backgroundColor[labelIndex] || defaultColors[datasetIndex % defaultColors.length];
+                } else {
+                    // Tek renk veya default
+                    color = dataset.backgroundColor || defaultColors[datasetIndex % defaultColors.length];
+                }
                 
                 colors.push(color);
                 

@@ -785,3 +785,55 @@
     color: var(--secondary-600);
     font-style: italic;
 }
+
+/* Historical Data Period Filter */
+.historical-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--secondary-200);
+}
+
+.period-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.period-filter label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--secondary-700);
+    white-space: nowrap;
+}
+
+.period-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--secondary-300);
+    border-radius: 6px;
+    background: white;
+    font-size: 0.9rem;
+    color: var(--secondary-800);
+    min-width: 140px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.period-select:hover {
+    border-color: var(--primary-400);
+}
+
+.period-select:focus {
+    outline: none;
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+.historical-data-section h4 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--secondary-900);
+}

@@ -116,6 +116,8 @@ const ChartDisplay = ({ chart }) => {
     const [error, setError] = useState('');
     const [selectedFilter, setSelectedFilter] = useState(null);
     const [hiddenGroups, setHiddenGroups] = useState([]); // gizlenen gruplar (groupId listesi)
+    // Kaç dönem gösterileceğini ayarlayan state (varsayılan 2)
+    const [periodsToShow, setPeriodsToShow] = useState(2);
     
     const currentPeriod = periodService.getCurrentPeriod();
 
@@ -257,17 +259,38 @@ const ChartDisplay = ({ chart }) => {
             showHistoricalInChart: chartDetails.showHistoricalInChart
         });
 
-        // Create labels for periods (X-axis: Geçmiş Dönem 2, Geçmiş Dönem 1, Güncel Dönem)
+        // Geçmiş dönem verilerini filtrele
+        const filteredHistoricalData = filterHistoricalPeriods(data.historicalData, periodsToShow);
+
+        // Grafikte sıralama: Manuel dönemler (Geçmiş Dönem 2, 1) → Gerçek dönemler (kronolojik) → Güncel
         const periodLabels = [];
         
-        // Add historical periods in reverse order (oldest first)
-        if (data.historicalData && data.historicalData.length > 0) {
-            // Sort by period in ascending order (oldest first: Geçmiş Dönem 2, Geçmiş Dönem 1)
-            const sortedHistorical = [...data.historicalData].sort((a, b) => (a.period || 0) - (b.period || 0));
-            sortedHistorical.forEach(period => {
-                periodLabels.push(period.periodLabel || `Geçmiş ${period.period || 'Dönem'}`);
-            });
-        }
+        // Filtrelenmiş verileri manuel ve gerçek dönem olarak ayır
+        const manualPeriods = filteredHistoricalData.filter(period => 
+            period.periodLabel && period.periodLabel.includes('Geçmiş Dönem')
+        );
+        const realPeriods = filteredHistoricalData.filter(period => 
+            period.periodLabel && !period.periodLabel.includes('Geçmiş Dönem')
+        );
+
+        // Manuel dönemleri ekle (Geçmiş Dönem 2, Geçmiş Dönem 1 sırasında)
+        const sortedManualPeriods = manualPeriods.sort((a, b) => {
+            const getOrder = (label) => {
+                if (label.includes('Geçmiş Dönem 2')) return 2;
+                if (label.includes('Geçmiş Dönem 1')) return 1;
+                return 0;
+            };
+            return getOrder(b.periodLabel) - getOrder(a.periodLabel);
+        });
+
+        sortedManualPeriods.forEach(period => {
+            periodLabels.push(period.periodLabel);
+        });
+
+        // Gerçek dönemleri kronolojik sırada ekle
+        realPeriods.forEach(period => {
+            periodLabels.push(period.periodLabel);
+        });
         
         // Add current period
         periodLabels.push('Güncel Dönem');
@@ -296,26 +319,37 @@ const ChartDisplay = ({ chart }) => {
         const datasets = indicators.map((indicator) => {
             const indicatorData = [];
             
-            // Collect data for this indicator across all periods
-            if (data.historicalData && data.historicalData.length > 0) {
-                const sortedHistorical = [...data.historicalData].sort((a, b) => (a.period || 0) - (b.period || 0));
-                sortedHistorical.forEach(period => {
-                    console.log(`Searching in ${period.periodLabel} for indicator:`, indicator.originalLabel);
-                    console.log(`Available data in this period:`, period.data);
-                    let item = period.data.find(d => d.label === indicator.originalLabel);
-                    if (!item) {
-                        // Try to find by partial match (remove period suffix)
-                        const baseLabel = indicator.originalLabel.replace(/\s*-\s*Güncel Dönem\s*$/, '').trim();
-                        item = period.data.find(d => 
-                            d.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim() === baseLabel
-                        );
-                        console.log(`Base label search: "${baseLabel}" -> found:`, item);
-                    }
-                    const value = item ? item.value : 0;
-                    indicatorData.push(value);
-                    console.log(`Historical period ${period.periodLabel}: ${indicator.originalLabel} = ${value}`);
-                });
-            }
+            // Manuel dönemlerden veri topla (sıralı: Geçmiş Dönem 2, Geçmiş Dönem 1)
+            sortedManualPeriods.forEach(period => {
+                console.log(`Searching in ${period.periodLabel} for indicator:`, indicator.originalLabel);
+                let item = period.data.find(d => d.label === indicator.originalLabel);
+                if (!item) {
+                    // Try to find by partial match (remove period suffix)
+                    const baseLabel = indicator.originalLabel.replace(/\s*-\s*Güncel Dönem\s*$/, '').trim();
+                    item = period.data.find(d => 
+                        d.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim() === baseLabel
+                    );
+                }
+                const value = item ? item.value : 0;
+                indicatorData.push(value);
+                console.log(`Manual period ${period.periodLabel}: ${indicator.originalLabel} = ${value}`);
+            });
+
+            // Gerçek dönemlerden veri topla (kronolojik sırada)
+            realPeriods.forEach(period => {
+                console.log(`Searching in ${period.periodLabel} for indicator:`, indicator.originalLabel);
+                let item = period.data.find(d => d.label === indicator.originalLabel);
+                if (!item) {
+                    // Try to find by partial match (remove period suffix)
+                    const baseLabel = indicator.originalLabel.replace(/\s*-\s*Güncel Dönem\s*$/, '').trim();
+                    item = period.data.find(d => 
+                        d.label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim() === baseLabel
+                    );
+                }
+                const value = item ? item.value : 0;
+                indicatorData.push(value);
+                console.log(`Real period ${period.periodLabel}: ${indicator.originalLabel} = ${value}`);
+            });
             
             // Add current period data
             const currentItem = data.currentData.find(d => d.label === indicator.originalLabel);
@@ -367,6 +401,95 @@ const ChartDisplay = ({ chart }) => {
             };
         });
         return { labels: periodLabels, datasets };
+    };
+
+    // Geçmiş dönem verilerini filtreleyen yardımcı fonksiyon
+    const filterHistoricalPeriods = (rawHistoricalData, periodsCount = 2) => {
+        if (!rawHistoricalData || rawHistoricalData.length === 0) return [];
+
+        // Tüm dönem verilerini al (manuel + gerçek dönemler)
+        const allPeriods = [...rawHistoricalData];
+
+        // Dönemleri kategorilere ayır
+        const manualPeriods = allPeriods.filter(period => {
+            const label = period.periodLabel || '';
+            return label.includes('Geçmiş Dönem');
+        });
+
+        const realPeriods = allPeriods.filter(period => {
+            const label = period.periodLabel || '';
+            return !label.includes('Geçmiş Dönem') && 
+                   /^\d{4}-P\d+$/.test(label.trim());
+        });
+
+        // Gerçek dönemleri kronolojik olarak sırala (yıl + period'a göre)
+        const sortedRealPeriods = realPeriods.sort((a, b) => {
+            const parseLabel = (label) => {
+                const match = label.match(/^(\d{4})-P(\d+)$/);
+                if (!match) return { year: 0, period: 0 };
+                return { year: parseInt(match[1]), period: parseInt(match[2]) };
+            };
+
+            const aData = parseLabel(a.periodLabel);
+            const bData = parseLabel(b.periodLabel);
+
+            // Önce yıla göre, sonra periode göre sırala
+            if (aData.year !== bData.year) {
+                return aData.year - bData.year;
+            }
+            return aData.period - bData.period;
+        });
+
+        // Manuel dönemleri sırala (Geçmiş Dönem 2, Geçmiş Dönem 1)
+        const sortedManualPeriods = manualPeriods.sort((a, b) => {
+            const getManualOrder = (label) => {
+                if (label.includes('Geçmiş Dönem 2')) return 2;
+                if (label.includes('Geçmiş Dönem 1')) return 1;
+                return 0;
+            };
+            return getManualOrder(b.periodLabel) - getManualOrder(a.periodLabel);
+        });
+
+        // Toplam istenen dönem sayısından fazla varsa, en yeni dönemleri al
+        const totalAvailable = sortedManualPeriods.length + sortedRealPeriods.length;
+        
+        if (periodsCount >= 999) {
+            // Tüm dönemler isteniyorsa hepsini gönder
+            return [...sortedManualPeriods, ...sortedRealPeriods];
+        }
+
+        if (totalAvailable <= periodsCount) {
+            // Tüm dönemler sığıyorsa hepsini gönder
+            return [...sortedManualPeriods, ...sortedRealPeriods];
+        }
+
+        // Dönem sayısı sınırlanması gerekiyorsa, akıllı dağıtım:
+        let selectedRealPeriods = [];
+        let selectedManualPeriods = [];
+
+        if (periodsCount === 1) {
+            // Sadece 1 dönem isteniyorsa, en yeni gerçek dönem veya Geçmiş Dönem 1'i al
+            if (sortedRealPeriods.length > 0) {
+                selectedRealPeriods = sortedRealPeriods.slice(-1);
+            } else if (sortedManualPeriods.length > 0) {
+                // Gerçek dönem yoksa Geçmiş Dönem 1'i al (öncelikli)
+                selectedManualPeriods = sortedManualPeriods.filter(p => 
+                    p.periodLabel.includes('Geçmiş Dönem 1')
+                ).slice(0, 1);
+            }
+        } else {
+            // 2 veya daha fazla dönem isteniyorsa
+            // Önce en yeni gerçek dönemleri al, kalan yerleri manuel dönemlerle doldur
+            const maxRealCount = Math.min(periodsCount, sortedRealPeriods.length);
+            selectedRealPeriods = sortedRealPeriods.slice(-maxRealCount);
+            
+            const remainingSlots = periodsCount - selectedRealPeriods.length;
+            if (remainingSlots > 0) {
+                selectedManualPeriods = sortedManualPeriods.slice(0, remainingSlots);
+            }
+        }
+
+        return [...selectedManualPeriods, ...selectedRealPeriods];
     };
 
     const formatGroupedChartData = (data) => {
@@ -867,12 +990,32 @@ const ChartDisplay = ({ chart }) => {
     const renderHistoricalChart = () => {
         if (!historicalData || historicalData.length === 0) return null;
 
-    // Eğer HistoricalDataDisplayType.StackedColumn seçiliyse yüzde bazlı yığılmış sütunlar çiz
-    const useStacked100 = chartDetails.historicalDataDisplayType === 3; // StackedColumn
+        // Geçmiş dönem verilerini filtrele
+        const filteredHistoricalData = filterHistoricalPeriods(historicalData, periodsToShow);
 
-        // Güncel + geçmiş dönemleri sırala (en eski -> güncel)
-        const periodsSorted = [...historicalData]
-            .sort((a, b) => (a.period || 0) - (b.period || 0));
+        // Eğer HistoricalDataDisplayType.StackedColumn seçiliyse yüzde bazlı yığılmış sütunlar çiz
+        const useStacked100 = chartDetails.historicalDataDisplayType === 3; // StackedColumn
+
+        // Filtrelenmiş dönemleri grafikte doğru sırada düzenle: Manuel → Gerçek → Güncel
+        const manualPeriods = filteredHistoricalData.filter(period => 
+            period.periodLabel && period.periodLabel.includes('Geçmiş Dönem')
+        );
+        const realPeriods = filteredHistoricalData.filter(period => 
+            period.periodLabel && !period.periodLabel.includes('Geçmiş Dönem')
+        );
+
+        // Manuel dönemleri sırala (Geçmiş Dönem 2, Geçmiş Dönem 1)
+        const sortedManualPeriods = manualPeriods.sort((a, b) => {
+            const getOrder = (label) => {
+                if (label.includes('Geçmiş Dönem 2')) return 2;
+                if (label.includes('Geçmiş Dönem 1')) return 1;
+                return 0;
+            };
+            return getOrder(b.periodLabel) - getOrder(a.periodLabel);
+        });
+
+        // Grafikte sıralama: Manuel dönemler → Gerçek dönemler (kronolojik) → Güncel
+        const periodsSorted = [...sortedManualPeriods, ...realPeriods];
 
         // En sona güncel dönemi ekle
         if (chartData && chartData.currentData) {
@@ -907,15 +1050,28 @@ const ChartDisplay = ({ chart }) => {
                 });
             });
 
+            console.log('3D Chart - flatLabels:', flatLabels);
+            console.log('3D Chart - flatValues:', flatValues);
+            console.log('3D Chart - flatColors:', flatColors);
+
             const data3D = {
                 labels: flatLabels,
                 datasets: [{
                     label: 'Dönem × Gösterge',
                     data: flatValues,
-                    backgroundColor: flatColors
+                    backgroundColor: flatColors // Array of colors for each bar
                 }]
             };
-            const options3D = { plugins: { title: { display: true, text: 'Geçmiş Dönem - Gösterge Dağılımı (3D)' } } };
+            const options3D = { 
+                plugins: { 
+                    title: { 
+                        display: true, 
+                        text: 'Geçmiş Dönem - Gösterge Dağılımı (3D)' 
+                    } 
+                },
+                // 3D chart için renk bilgisini ekstra gönder
+                colors: flatColors
+            };
 
             // Grup bilgisi: her dönem için kaç gösterge (groupSize)
             const groupSize = baseIndicators.length;
@@ -1062,8 +1218,39 @@ const ChartDisplay = ({ chart }) => {
             });
         }
         
-        // Sonra geçmiş verileri ekle (backend'den filtrelenmiş)
-        historicalData.forEach(period => {
+        // Geçmiş dönem verilerini filtrele ve ekle
+        const filteredHistoricalData = filterHistoricalPeriods(historicalData, periodsToShow);
+        
+        // Tabloda sıralama: Güncel → Gerçek dönemler (yeni→eski) → Geçmiş Dönem 1 → Geçmiş Dönem 2
+        const manualPeriods = filteredHistoricalData.filter(period => 
+            period.periodLabel && period.periodLabel.includes('Geçmiş Dönem')
+        );
+        const realPeriods = filteredHistoricalData.filter(period => 
+            period.periodLabel && !period.periodLabel.includes('Geçmiş Dönem')
+        );
+
+        // Gerçek dönemleri ters çevir (yeniden eskiye)
+        const reversedRealPeriods = [...realPeriods].reverse();
+        
+        // Manuel dönemleri sırala (Geçmiş Dönem 1, Geçmiş Dönem 2)
+        const sortedManualPeriodsForTable = manualPeriods.sort((a, b) => {
+            const getOrder = (label) => {
+                if (label.includes('Geçmiş Dönem 1')) return 1;
+                if (label.includes('Geçmiş Dönem 2')) return 2;
+                return 0;
+            };
+            return getOrder(a.periodLabel) - getOrder(b.periodLabel);
+        });
+
+        // Tabloda sırayla ekle: Gerçek dönemler (yeni→eski) → Manuel dönemler (1→2)
+        reversedRealPeriods.forEach(period => {
+            allPeriodsData.push({
+                ...period,
+                isCurrent: false
+            });
+        });
+
+        sortedManualPeriodsForTable.forEach(period => {
             allPeriodsData.push({
                 ...period,
                 isCurrent: false
@@ -1076,7 +1263,25 @@ const ChartDisplay = ({ chart }) => {
 
         return (
             <div className="historical-data-section">
-                <h4>{tableTitle}</h4>
+                <div className="historical-header">
+                    <h4>{tableTitle}</h4>
+                    <div className="period-filter">
+                        <label>Gösterilecek Dönem Sayısı:</label>
+                        <select 
+                            value={periodsToShow} 
+                            onChange={(e) => setPeriodsToShow(parseInt(e.target.value))}
+                            className="period-select"
+                        >
+                            <option value={1}>Son 1 Dönem</option>
+                            <option value={2}>Son 2 Dönem</option>
+                            <option value={3}>Son 3 Dönem</option>
+                            <option value={4}>Son 4 Dönem</option>
+                            <option value={5}>Son 5 Dönem</option>
+                            <option value={6}>Son 6 Dönem</option>
+                            <option value={999}>Tüm Dönemler</option>
+                        </select>
+                    </div>
+                </div>
                 
                 {/* Chart 2 için özel: her zaman tablo görünümü kullan */}
                 {(chartDetails.chartId === 2 || chartDetails.historicalDataDisplayType === 1 || !chartDetails.historicalDataDisplayType) ? ( // Table or default or Chart 2
