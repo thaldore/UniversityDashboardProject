@@ -32,6 +32,69 @@ const ChartsPage = () => {
 
     const isAdmin = user?.roles?.includes('Admin') || false;
 
+    // Helper function to find section in nested hierarchy
+    const findSectionInHierarchy = (sectionsData, targetId) => {
+        for (const section of sectionsData) {
+            if (section.sectionId === targetId) {
+                return section;
+            }
+            if (section.children) {
+                const found = findSectionInHierarchy(section.children, targetId);
+                if (found) return found;
+            }
+        }
+        return null;
+    };
+
+    // Helper function to update nested subsections recursively
+    const updateNestedSubSections = (sections, parentSectionId, subSectionId, updates) => {
+        return sections.map(section => {
+            // Check if this is the parent section
+            if (section.id === parentSectionId) {
+                return {
+                    ...section,
+                    subSections: section.subSections?.map(subSection =>
+                        subSection.id === subSectionId
+                            ? { ...subSection, ...updates }
+                            : subSection
+                    ) || []
+                };
+            }
+            
+            // Recursively search in subsections
+            if (section.subSections) {
+                const updateSubSections = (subSections) => {
+                    return subSections.map(subSection => {
+                        if (subSection.id === parentSectionId) {
+                            return {
+                                ...subSection,
+                                subSections: subSection.subSections?.map(nestedSub =>
+                                    nestedSub.id === subSectionId
+                                        ? { ...nestedSub, ...updates }
+                                        : nestedSub
+                                ) || []
+                            };
+                        }
+                        if (subSection.subSections) {
+                            return {
+                                ...subSection,
+                                subSections: updateSubSections(subSection.subSections)
+                            };
+                        }
+                        return subSection;
+                    });
+                };
+                
+                return {
+                    ...section,
+                    subSections: updateSubSections(section.subSections)
+                };
+            }
+            
+            return section;
+        });
+    };
+
     const loadData = useCallback(async () => {
         try {
             setLoading(true);
@@ -238,15 +301,70 @@ const ChartsPage = () => {
         });
     };
 
-    // Toggle subsection expansion
+    // Toggle subsection expansion (recursive for nested subsections)
     const toggleSubSection = async (parentSectionId, subSectionId) => {
-        const parentSection = sections.find(s => s.id === parentSectionId);
-        if (!parentSection) return;
+        // Find the parent section (could be a main section or a subsection)
+        let parentSection = sections.find(s => s.id === parentSectionId);
+        let subSection = null;
         
-        const subSection = parentSection.subSections.find(s => s.id === subSectionId);
+        if (parentSection) {
+            subSection = parentSection.subSections?.find(s => s.id === subSectionId);
+        } else {
+            // Look for nested subsections
+            for (const section of sections) {
+                const findNestedSubSection = (subs, targetParentId, targetSubId) => {
+                    for (const sub of subs || []) {
+                        if (sub.id === targetParentId) {
+                            return sub.subSections?.find(s => s.id === targetSubId);
+                        }
+                        if (sub.subSections) {
+                            const found = findNestedSubSection(sub.subSections, targetParentId, targetSubId);
+                            if (found) return found;
+                        }
+                    }
+                    return null;
+                };
+                
+                subSection = findNestedSubSection(section.subSections, parentSectionId, subSectionId);
+                if (subSection) break;
+            }
+        }
+        
         if (!subSection) return;
         
         if (!subSection.isExpanded) {
+            // Load subsections for this subsection if it has them and they're not loaded
+            if (subSection.hasSubSections && (!subSection.subSections || subSection.subSections.length === 0)) {
+                try {
+                    const sectionsResponse = await chartService.getChartSections();
+                    const fullSubSectionData = findSectionInHierarchy(sectionsResponse.data, subSectionId);
+                    
+                    if (fullSubSectionData && fullSubSectionData.children) {
+                        const mappedNestedSubSections = fullSubSectionData.children.map(child => ({
+                            id: child.sectionId,
+                            title: child.sectionName || child.description || 'İsimsiz Başlık',
+                            description: child.description,
+                            parentSectionId: subSectionId,
+                            orderIndex: child.displayOrder,
+                            chartCount: child.chartCount,
+                            hasSubSections: child.children && child.children.length > 0,
+                            subSections: [],
+                            isExpanded: false,
+                            isLoaded: false
+                        }));
+                        
+                        // Update the subsection with its nested subsections
+                        setSections(prevSections => {
+                            return updateNestedSubSections(prevSections, parentSectionId, subSectionId, {
+                                subSections: mappedNestedSubSections
+                            });
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Error loading nested subsections for ${subSectionId}:`, err);
+                }
+            }
+            
             // Load charts for subsection if not already loaded
             if (!charts[subSectionId]) {
                 setLoadingCharts(prev => new Set(prev).add(subSectionId));
@@ -272,19 +390,11 @@ const ChartsPage = () => {
             }
         }
         
+        // Toggle the expansion state
         setSections(prevSections => {
-            return prevSections.map(section => 
-                section.id === parentSectionId 
-                    ? {
-                        ...section,
-                        subSections: section.subSections.map(subSection => 
-                            subSection.id === subSectionId 
-                                ? { ...subSection, isExpanded: !subSection.isExpanded }
-                                : subSection
-                        )
-                    }
-                    : section
-            );
+            return updateNestedSubSections(prevSections, parentSectionId, subSectionId, {
+                isExpanded: !subSection.isExpanded
+            });
         });
     };
 
@@ -417,6 +527,7 @@ const ChartsPage = () => {
         const subSectionCharts = charts[subSection.id] || [];
         const isExpanded = subSection.isExpanded;
         const isLoadingCharts = loadingCharts.has(subSection.id);
+        const hasSubSections = subSection.hasSubSections || (subSection.subSections && subSection.subSections.length > 0);
 
         return (
             <div key={`subsection-${subSection.id}`} className={`chart-section level-${level}`}>
@@ -472,10 +583,20 @@ const ChartsPage = () => {
                     <p className="section-description">{subSection.description}</p>
                 )}
 
-                {/* Charts in subsection (show only if expanded) */}
+                {/* Expanded content */}
                 {isExpanded && (
                     <div className="section-content">
-                        {subSectionCharts.length > 0 ? (
+                        {/* Sub-subsections (nested subsections) */}
+                        {hasSubSections && subSection.subSections && subSection.subSections.length > 0 && (
+                            <div className="sub-sections">
+                                {subSection.subSections.map(nestedSubSection => 
+                                    renderSubSection(nestedSubSection, subSection.id, level + 1)
+                                )}
+                            </div>
+                        )}
+
+                        {/* Charts in subsection */}
+                        {subSectionCharts.length > 0 && (
                             <div className="charts-container">
                                 {subSectionCharts.map(chart => (
                                     <div key={`chart-${chart.chartId || chart.id}`} className="chart-item">
@@ -502,7 +623,10 @@ const ChartsPage = () => {
                                     </div>
                                 ))}
                             </div>
-                        ) : (
+                        )}
+
+                        {/* Show empty message only if no charts and no subsections */}
+                        {!hasSubSections && subSectionCharts.length === 0 && (
                             <div className="empty-content">
                                 <p>Bu alt bölümde henüz grafik bulunmuyor.</p>
                                 {isAdmin && (
