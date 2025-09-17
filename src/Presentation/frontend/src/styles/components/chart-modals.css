@@ -731,113 +731,190 @@
     }
 }
 
-/* Group Hierarchy Styles */
-.group-hierarchy {
-    margin-bottom: 2rem;
+/* Group Management Styles - Simplified */
+.groups-info-box {
+    display: flex;
+    gap: 0.75rem;
+    background: var(--secondary-25);
     border: 1px solid var(--secondary-200);
     border-radius: 8px;
-    overflow: hidden;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.groups-info-box .info-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+    color: var(--primary-600);
+}
+
+.groups-info-box .info-text {
+    font-size: 0.875rem;
+    color: var(--secondary-700);
+    line-height: 1.5;
+}
+
+.group-item {
     background: white;
-}
-
-.main-group-item {
-    background: var(--primary-50);
-    border-bottom: 2px solid var(--primary-200);
+    border: 1px solid var(--secondary-200);
+    border-radius: 8px;
     padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: all 0.2s ease;
 }
 
-.sub-group-item {
-    background: var(--secondary-25);
-    border-bottom: 1px solid var(--secondary-200);
-    padding: 1rem 1.5rem;
-    margin-left: 2rem;
-    position: relative;
+.group-item:hover {
+    border-color: var(--primary-300);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.sub-group-item:before {
-    content: '';
-    position: absolute;
-    left: -2rem;
-    top: 0;
-    bottom: 0;
-    width: 2rem;
-    border-left: 2px solid var(--secondary-300);
-    border-bottom: 2px solid var(--secondary-300);
-    border-bottom-left-radius: 8px;
+.group-controls {
+    display: grid;
+    grid-template-columns: 2fr 2fr 120px 50px auto;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1rem;
 }
 
-.sub-group-item:last-child:before {
-    border-bottom: none;
-    height: 50%;
+.group-controls .form-input,
+.group-controls .form-select {
+    font-size: 0.9rem;
 }
 
-.sub-group-indicator {
-    color: var(--secondary-500);
-    font-weight: bold;
-    margin-right: 0.5rem;
-    font-family: monospace;
+.color-input {
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--secondary-300);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.add-subgroup-section {
+.color-input:hover {
+    border-color: var(--primary-400);
+}
+
+/* Group Indicators Section */
+.group-indicators {
     margin-top: 1rem;
     padding-top: 1rem;
-    border-top: 1px solid var(--primary-200);
+    border-top: 1px solid var(--secondary-200);
 }
 
-.add-subgroup-btn {
-    background: var(--secondary-100);
+.group-indicators h5 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9rem;
     color: var(--secondary-700);
-    border: 1px dashed var(--secondary-400);
+    font-weight: 600;
 }
 
-.add-subgroup-btn:hover {
-    background: var(--secondary-200);
-    border-style: solid;
+.group-indicator-selection {
+    margin-bottom: 0.75rem;
 }
 
-.sub-group-indicators {
-    margin-left: 1rem;
-    padding-left: 1rem;
-    border-left: 2px solid var(--secondary-300);
+.selected-group-indicators {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-height: 2rem;
 }
 
+.mini-indicator-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    background: var(--primary-100);
+    color: var(--primary-800);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    border: 1px solid var(--primary-300);
+    transition: all 0.2s ease;
+}
+
+.mini-indicator-tag:hover {
+    background: var(--primary-150);
+    border-color: var(--primary-400);
+}
+
+.remove-indicator-btn {
+    background: none;
+    border: none;
+    color: var(--primary-600);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.remove-indicator-btn:hover {
+    background: var(--primary-200);
+    color: var(--primary-800);
+}
+
+/* No Groups Information */
 .no-groups-info {
     background: var(--secondary-50);
-    border: 1px solid var(--secondary-200);
+    border: 1px dashed var(--secondary-300);
     border-radius: 8px;
     padding: 2rem;
     text-align: center;
     color: var(--secondary-600);
+    font-size: 0.9rem;
 }
 
-.no-groups-info h4 {
-    color: var(--primary-700);
-    margin-bottom: 1rem;
+.no-groups-info p {
+    margin: 0 0 1rem 0;
 }
 
 .no-groups-info ul {
     text-align: left;
-    max-width: 400px;
+    max-width: 500px;
     margin: 1rem auto 0;
+    list-style-type: disc;
+    padding-left: 1.5rem;
 }
 
 .no-groups-info li {
     margin-bottom: 0.5rem;
+    line-height: 1.4;
 }
 
-/* Responsive adjustments for group hierarchy */
+/* Responsive Group Management */
+@media (max-width: 1024px) {
+    .group-controls {
+        grid-template-columns: 1fr 1fr auto;
+        gap: 0.75rem;
+    }
+    
+    .group-controls .form-select {
+        grid-column: 1 / -2;
+    }
+    
+    .color-input {
+        grid-column: -2;
+    }
+}
+
 @media (max-width: 768px) {
-    .sub-group-item {
-        margin-left: 1rem;
+    .group-controls {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
     }
     
-    .sub-group-item:before {
-        left: -1rem;
-        width: 1rem;
+    .groups-info-box {
+        flex-direction: column;
+        gap: 0.5rem;
     }
     
-    .sub-group-indicators {
-        margin-left: 0.5rem;
-        padding-left: 0.5rem;
+    .no-groups-info ul {
+        max-width: 100%;
     }
 }

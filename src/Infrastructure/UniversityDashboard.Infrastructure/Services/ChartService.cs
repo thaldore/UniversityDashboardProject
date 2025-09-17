@@ -204,6 +204,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                         Description = cg.Description,
                         DisplayOrder = cg.DisplayOrder,
                         Color = cg.Color,
+                        GroupType = cg.GroupType, // GroupType eksikti!
                         Indicators = cg.ChartGroupIndicators
                             .OrderBy(cgi => cgi.DisplayOrder)
                             .Select(cgi => new ChartIndicatorDto
@@ -297,7 +298,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                         GroupName = group.GroupName,
                         Description = group.Description,
                         DisplayOrder = group.DisplayOrder,
-                        Color = group.Color
+                        Color = group.Color,
+                        GroupType = group.GroupType // GroupType eksikti!
                     };
                     _context.ChartGroups.Add(chartGroup);
                     await _context.SaveChangesAsync();
@@ -416,7 +418,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                         GroupName = group.GroupName,
                         Description = group.Description,
                         DisplayOrder = group.DisplayOrder,
-                        Color = group.Color
+                        Color = group.Color,
+                        GroupType = group.GroupType // GroupType eksikti!
                     };
                     _context.ChartGroups.Add(chartGroup);
                     await _context.SaveChangesAsync();
@@ -539,16 +542,16 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             }
 
             // Build current data with grouping support
-            var hasSubGroups = chart.ChartGroups.Any(g => g.GroupType == GroupType.NameGroup);
+            var hasAnyGroups = chart.ChartGroups.Any(); // Herhangi bir grup var mı (ColorGroup veya NameGroup)
             
-            if (hasSubGroups)
+            if (hasAnyGroups)
             {
-                // Alt gruplar varsa, gösterge isimlerini koru ancak gruplandırma metadata'sı ekle
+                // Herhangi bir grup varsa (renk veya isim grubu), grup metadata'sı ile veri oluştur
                 BuildGroupedChartData(chart, indicatorsToShow, request, response);
             }
             else
             {
-                // Alt grup yoksa standart chart data oluştur
+                // Hiç grup yoksa standart chart data oluştur
                 BuildStandardChartData(indicatorsToShow, request, response, chart);
             }
 
@@ -625,25 +628,32 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
         private void BuildGroupedChartData(Chart chart, IQueryable<ChartIndicator> indicatorsToShow, ChartDataRequest request, ChartDataResponseDto response)
         {
-            var subGroups = chart.ChartGroups.Where(g => g.GroupType == GroupType.NameGroup).OrderBy(g => g.DisplayOrder).ToList();
-            var mainGroups = chart.ChartGroups.Where(g => g.GroupType == GroupType.ColorGroup).ToList();
+            var colorGroups = chart.ChartGroups.Where(g => g.GroupType == GroupType.ColorGroup).ToList();
+            var nameGroups = chart.ChartGroups.Where(g => g.GroupType == GroupType.NameGroup).ToList();
             
-            // Tüm göstergeleri işle - gösterge isimlerini koru
+            // Tüm göstergeleri işle
             foreach (var chartIndicator in indicatorsToShow.OrderBy(ci => ci.DisplayOrder))
             {
                 var indicatorData = GetIndicatorData(chartIndicator, request);
                 if (indicatorData != null)
                 {
-                    // Bu göstergenin hangi alt grupta olduğunu bul
-                    var subGroup = subGroups.FirstOrDefault(sg => 
-                        sg.ChartGroupIndicators.Any(cgi => cgi.IndicatorId == chartIndicator.IndicatorId));
+                    // Bu göstergenin hangi renk grubunda olduğunu bul
+                    var colorGroup = colorGroups.FirstOrDefault(cg => 
+                        cg.ChartGroupIndicators.Any(cgi => cgi.IndicatorId == chartIndicator.IndicatorId));
                     
-                    // Ana grubun rengini al
-                    var parentGroup = mainGroups.FirstOrDefault(mg => 
-                        mg.ChartGroupIndicators.Any(cgi => cgi.IndicatorId == chartIndicator.IndicatorId) ||
-                        (subGroup != null && mg.GroupId == subGroup.ParentGroupId));
+                    // Bu göstergenin hangi isim grubunda olduğunu bul
+                    var nameGroup = nameGroups.FirstOrDefault(ng => 
+                        ng.ChartGroupIndicators.Any(cgi => cgi.IndicatorId == chartIndicator.IndicatorId));
                     
-                    var color = parentGroup?.Color ?? chartIndicator.Color ?? "#3b82f6";
+                    // Renk grubundan rengi al, yoksa varsayılan renk
+                    var color = colorGroup?.Color ?? chartIndicator.Color ?? "#3b82f6";
+                    
+                    // Debug log
+                    Console.WriteLine($"[DEBUG] Indicator: {chartIndicator.Label}, " +
+                        $"ColorGroup: {colorGroup?.GroupName ?? "None"}, " +
+                        $"ColorGroupColor: {colorGroup?.Color ?? "None"}, " +
+                        $"DefaultColor: {chartIndicator.Color}, " +
+                        $"FinalColor: {color}");
                     
                     response.CurrentData.Add(new ChartDataDto
                     {
@@ -656,13 +666,15 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                             { "IndicatorCode", chartIndicator.Indicator.IndicatorCode },
                             { "IndicatorId", chartIndicator.IndicatorId },
                             { "IndicatorName", chartIndicator.Label ?? chartIndicator.Indicator.IndicatorName },
-                            { "GroupName", subGroup?.GroupName ?? "" }, // Alt grup varsa ismini ekle
-                            { "GroupId", subGroup?.GroupId ?? 0 },
-                            { "ParentGroupId", subGroup?.ParentGroupId ?? parentGroup?.GroupId ?? 0 },
-                            { "ParentGroupName", parentGroup?.GroupName ?? "" },
+                            { "ColorGroupId", colorGroup?.GroupId ?? 0 },
+                            { "ColorGroupName", colorGroup?.GroupName ?? "" },
+                            { "ColorGroupColor", colorGroup?.Color ?? chartIndicator.Color ?? "#3b82f6" }, // Color group rengi
+                            { "HasColorGroup", colorGroup != null }, // Renk grubunda olup olmadığını belirt
+                            { "NameGroupId", nameGroup?.GroupId ?? 0 },
+                            { "NameGroupName", nameGroup?.GroupName ?? "" },
+                            { "HasNameGroup", nameGroup != null }, // İsim grubunda olup olmadığını belirt
                             { "Year", indicatorData.Year },
-                            { "Period", indicatorData.Period },
-                            { "HasSubGroup", subGroup != null } // Alt grupta olup olmadığını belirt
+                            { "Period", indicatorData.Period }
                         }
                     });
                 }

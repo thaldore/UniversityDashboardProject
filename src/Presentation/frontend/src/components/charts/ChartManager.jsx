@@ -131,17 +131,25 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                 const groups = sourceChart.groups || sourceChart.Groups || [];
                 console.log('Original chart groups:', groups);
                 
-                // Yeni hiyerarşik grup yapısını düz frontend yapısına çevir
+                // Basit grup yapısını frontend yapısına çevir
                 const mappedGroups = groups.map((g, idx) => {
                     console.log(`Processing group ${idx}:`, g);
+                    
+                    // Backend'den GroupType öncelikli al, yoksa varsayılan değer kullan
+                    const groupType = g.groupType !== undefined ? g.groupType : 
+                                    (g.GroupType !== undefined ? g.GroupType : GroupType.ColorGroup);
+                    
+                    console.log(`Group ${idx} GroupType mapping:`, {
+                        original: { groupType: g.groupType, GroupType: g.GroupType },
+                        final: groupType
+                    });
                     
                     return {
                         groupName: g.groupName || g.GroupName || `Grup ${idx+1}`,
                         description: g.description || g.Description || '',
                         displayOrder: g.displayOrder || g.DisplayOrder || idx + 1,
                         color: g.color || g.Color || CHART_COLORS[idx % CHART_COLORS.length],
-                        groupType: g.groupType || g.GroupType || 1, // GroupType eklendi
-                        parentGroupId: g.parentGroupId || g.ParentGroupId || null, // ParentGroupId eklendi
+                        groupType: groupType,
                         // Backend'den gelen gösterge listesi
                         indicatorIds: g.indicatorIds ? g.indicatorIds : 
                             (g.indicators ? g.indicators.map(x => x.indicatorId || x.IndicatorId) : 
@@ -242,27 +250,14 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
         );
     };
 
-    const handleAddGroup = (parentGroupIndex = null) => {
-        const clientId = `client_${Date.now()}_${Math.random()}`;
-        let parentClientId = null;
-        let parentGroupId = null;
-        
-        if (parentGroupIndex !== null) {
-            const parentGroup = chartGroups[parentGroupIndex];
-            parentClientId = parentGroup?.clientId || `client_${parentGroupIndex}`;
-            parentGroupId = parentGroup?.groupId || parentGroupIndex;
-        }
-        
+    const handleAddGroup = () => {
         const newGroup = {
             groupName: '',
             description: '',
             displayOrder: chartGroups.length + 1,
-            color: parentGroupIndex === null ? CHART_COLORS[chartGroups.length % CHART_COLORS.length] : null,
-            groupType: parentGroupIndex !== null ? GroupType.NameGroup : GroupType.ColorGroup,
-            parentGroupId: parentGroupId,
-            parentClientId: parentClientId,
-            indicatorIds: [],
-            clientId: clientId
+            color: CHART_COLORS[chartGroups.length % CHART_COLORS.length],
+            groupType: GroupType.ColorGroup, // Varsayılan olarak ColorGroup
+            indicatorIds: []
         };
         setChartGroups(prev => [...prev, newGroup]);
     };
@@ -381,29 +376,14 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                     displayOrder: parseInt(filter.displayOrder),
                     indicatorIds: filter.indicatorIds.map(id => parseInt(id))
                 })),
-                groups: chartGroups.map((group, index) => {
-                    // Parent client ID mapping
-                    let resolvedParentClientId = null;
-                    if (group.parentClientId) {
-                        resolvedParentClientId = group.parentClientId;
-                    } else if (group.parentGroupId !== null) {
-                        // Mevcut parent group'un client ID'sini bul
-                        const parentGroup = chartGroups.find((g, i) => i === group.parentGroupId);
-                        resolvedParentClientId = parentGroup?.clientId || `client_${group.parentGroupId}`;
-                    }
-                    
-                    return {
-                        groupName: group.groupName,
-                        description: group.description,
-                        displayOrder: parseInt(group.displayOrder),
-                        color: group.groupType === GroupType.ColorGroup ? group.color : null, // Alt gruplar renk kullanmaz
-                        groupType: group.groupType || GroupType.ColorGroup,
-                        parentGroupId: group.parentGroupId,
-                        clientId: group.clientId || `client_${index}`, // String olarak clientId
-                        parentClientId: resolvedParentClientId,
-                        indicatorIds: group.indicatorIds.map(id => parseInt(id))
-                    };
-                })
+                groups: chartGroups.map((group) => ({
+                    groupName: group.groupName,
+                    description: group.description,
+                    displayOrder: parseInt(group.displayOrder),
+                    color: group.groupType === GroupType.ColorGroup ? group.color : null,
+                    groupType: group.groupType || GroupType.ColorGroup,
+                    indicatorIds: group.indicatorIds.map(id => parseInt(id))
+                }))
             };
 
             console.log('Sending chart data:', chartData);
@@ -801,210 +781,123 @@ const ChartManager = ({ isOpen, onClose, onSuccess, sectionId, chart, indicators
                                     onClick={() => handleAddGroup()}
                                 >
                                     <PlusIcon className="w-3 h-3" />
-                                    Ekle
+                                    Grup Ekle
                                 </button>
                             </div>
                             
-                            {/* Ana Gruplar ve Alt Gruplar Hierarşik Görünümü */}
-                            {chartGroups
-                                .filter(group => group.groupType === GroupType.ColorGroup)
-                                .map((mainGroup) => {
-                                    const actualMainIndex = chartGroups.indexOf(mainGroup);
-                                    const subGroups = chartGroups.filter(group => 
-                                        group.groupType === GroupType.NameGroup && 
-                                        (group.parentClientId === mainGroup.clientId)
-                                    );
+                            <div className="groups-info-box">
+                                <div className="info-icon">ℹ️</div>
+                                <div className="info-text">
+                                    <strong>Grup Türleri:</strong>
+                                    <br />
+                                    <strong>• Renk Grubu (ColorGroup):</strong> Göstergelerin rengini belirler
+                                    <br />
+                                    <strong>• İsim Grubu (NameGroup):</strong> X-axis'te gruplandırma yapar (aynı grup altında gösterilir)
+                                </div>
+                            </div>
+                            
+                            {chartGroups.map((group, index) => (
+                                <div key={index} className="group-item">
+                                    <div className="group-controls">
+                                        <input
+                                            type="text"
+                                            value={group.groupName}
+                                            onChange={(e) => handleGroupChange(index, 'groupName', e.target.value)}
+                                            className="form-input"
+                                            placeholder="Grup Adı"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={group.description || ''}
+                                            onChange={(e) => handleGroupChange(index, 'description', e.target.value)}
+                                            className="form-input"
+                                            placeholder="Açıklama"
+                                        />
+                                        
+                                        <select
+                                            value={group.groupType}
+                                            onChange={(e) => handleGroupChange(index, 'groupType', parseInt(e.target.value))}
+                                            className="form-select"
+                                        >
+                                            <option value={GroupType.ColorGroup}>Renk Grubu</option>
+                                            <option value={GroupType.NameGroup}>İsim Grubu</option>
+                                        </select>
+                                        
+                                        {/* Sadece renk grupları için renk seçimi */}
+                                        {group.groupType === GroupType.ColorGroup && (
+                                            <input
+                                                type="color"
+                                                value={group.color || '#3b82f6'}
+                                                onChange={(e) => handleGroupChange(index, 'color', e.target.value)}
+                                                className="color-input"
+                                                title="Grup Rengi"
+                                            />
+                                        )}
+                                        
+                                        <button
+                                            type="button"
+                                            className="btn btn-sm btn-danger"
+                                            onClick={() => handleRemoveGroup(index)}
+                                            title="Grubu Sil"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                     
-                                    return (
-                                        <div key={actualMainIndex} className="group-hierarchy">
-                                            {/* Ana Grup */}
-                                            <div className="main-group-item">
-                                                <div className="group-controls">
-                                                    <input
-                                                        type="text"
-                                                        value={mainGroup.groupName}
-                                                        onChange={(e) => handleGroupChange(actualMainIndex, 'groupName', e.target.value)}
-                                                        className="form-input"
-                                                        placeholder="Ana Grup Adı (örn: Ulusal Dergi Yayın Grubu)"
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        value={mainGroup.description || ''}
-                                                        onChange={(e) => handleGroupChange(actualMainIndex, 'description', e.target.value)}
-                                                        className="form-input"
-                                                        placeholder="Açıklama"
-                                                    />
-                                                    
-                                                    {/* Ana grup için renk seçimi */}
-                                                    <input
-                                                        type="color"
-                                                        value={mainGroup.color || '#3b82f6'}
-                                                        onChange={(e) => handleGroupChange(actualMainIndex, 'color', e.target.value)}
-                                                        className="color-input"
-                                                        title="Ana Grup Rengi"
-                                                    />
-                                                    
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-sm btn-danger"
-                                                        onClick={() => handleRemoveGroup(actualMainIndex)}
-                                                        title="Ana Grubu Sil"
-                                                    >
-                                                        <TrashIcon className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                                
-                                                {/* Ana Grup Göstergeleri */}
-                                                <div className="group-indicators">
-                                                    <h5>Grup Göstergeleri</h5>
-                                                    <div className="group-indicator-selection">
-                                                        <select
-                                                            className="form-select"
-                                                            onChange={(e) => {
-                                                                if (e.target.value && !mainGroup.indicatorIds.includes(parseInt(e.target.value))) {
-                                                                    handleAddIndicatorToGroup(actualMainIndex, parseInt(e.target.value));
-                                                                    e.target.value = '';
-                                                                }
-                                                            }}
-                                                            defaultValue=""
+                                    {/* Grup Göstergeleri */}
+                                    <div className="group-indicators">
+                                        <h5>Grup Göstergeleri</h5>
+                                        <div className="group-indicator-selection">
+                                            <select
+                                                className="form-select"
+                                                onChange={(e) => {
+                                                    if (e.target.value && !group.indicatorIds.includes(parseInt(e.target.value))) {
+                                                        handleAddIndicatorToGroup(index, parseInt(e.target.value));
+                                                        e.target.value = '';
+                                                    }
+                                                }}
+                                                defaultValue=""
+                                            >
+                                                <option value="">Gösterge Seçin...</option>
+                                                {selectedIndicators
+                                                    .filter(ind => !group.indicatorIds.includes(ind.indicatorId))
+                                                    .map(ind => (
+                                                        <option key={ind.indicatorId} value={ind.indicatorId}>
+                                                            {ind.label}
+                                                        </option>
+                                                    ))
+                                                }
+                                            </select>
+                                        </div>
+                                        <div className="selected-group-indicators">
+                                            {group.indicatorIds.map(indicatorId => {
+                                                const indicator = selectedIndicators.find(ind => ind.indicatorId === indicatorId);
+                                                return indicator ? (
+                                                    <div key={indicatorId} className="mini-indicator-tag">
+                                                        <span>{indicator.label}</span>
+                                                        <button
+                                                            type="button"
+                                                            className="remove-indicator-btn"
+                                                            onClick={() => handleRemoveIndicatorFromGroup(index, indicatorId)}
                                                         >
-                                                            <option value="">Gösterge Seçin...</option>
-                                                            {selectedIndicators
-                                                                .filter(ind => !mainGroup.indicatorIds.includes(ind.indicatorId))
-                                                                .map(ind => (
-                                                                    <option key={ind.indicatorId} value={ind.indicatorId}>
-                                                                        {ind.label}
-                                                                    </option>
-                                                                ))
-                                                            }
-                                                        </select>
+                                                            ×
+                                                        </button>
                                                     </div>
-                                                    <div className="selected-group-indicators">
-                                                        {mainGroup.indicatorIds.map(indicatorId => {
-                                                            const indicator = selectedIndicators.find(ind => ind.indicatorId === indicatorId);
-                                                            return indicator ? (
-                                                                <div key={indicatorId} className="mini-indicator-tag">
-                                                                    <span>{indicator.label}</span>
-                                                                    <button
-                                                                        type="button"
-                                                                        className="remove-indicator-btn"
-                                                                        onClick={() => handleRemoveIndicatorFromGroup(actualMainIndex, indicatorId)}
-                                                                    >
-                                                                        ×
-                                                                    </button>
-                                                                </div>
-                                                            ) : null;
-                                                        })}
-                                                    </div>
-                                                </div>
-                                                
-                                                {/* Alt Grup Ekle Butonu */}
-                                                <div className="add-subgroup-section">
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-xs btn-secondary add-subgroup-btn"
-                                                        onClick={() => handleAddGroup(actualMainIndex)}
-                                                    >
-                                                        <PlusIcon className="w-3 h-3" />
-                                                        Alt Grup Ekle
-                                                    </button>
-                                                    <small className="text-muted">
-                                                        Alt gruplar ana grubun rengini kullanır ve aynı grubun altında toplanır.
-                                                    </small>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Alt Gruplar */}
-                                            {subGroups.map((subGroup) => {
-                                                const subIndex = chartGroups.indexOf(subGroup);
-                                                return (
-                                                    <div key={subIndex} className="sub-group-item">
-                                                        <div className="group-controls">
-                                                            <div className="sub-group-indicator">├─</div>
-                                                            <input
-                                                                type="text"
-                                                                value={subGroup.groupName}
-                                                                onChange={(e) => handleGroupChange(subIndex, 'groupName', e.target.value)}
-                                                                className="form-input"
-                                                                placeholder="Alt Grup Adı (örn: Tıp Fakültesi)"
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                value={subGroup.description || ''}
-                                                                onChange={(e) => handleGroupChange(subIndex, 'description', e.target.value)}
-                                                                className="form-input"
-                                                                placeholder="Açıklama"
-                                                            />
-                                                            
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-sm btn-danger"
-                                                                onClick={() => handleRemoveGroup(subIndex)}
-                                                                title="Alt Grubu Sil"
-                                                            >
-                                                                <TrashIcon className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                        
-                                                        {/* Alt Grup Göstergeleri */}
-                                                        <div className="group-indicators sub-group-indicators">
-                                                            <h5>Alt Grup Göstergeleri</h5>
-                                                            <div className="group-indicator-selection">
-                                                                <select
-                                                                    className="form-select"
-                                                                    onChange={(e) => {
-                                                                        if (e.target.value && !subGroup.indicatorIds.includes(parseInt(e.target.value))) {
-                                                                            handleAddIndicatorToGroup(subIndex, parseInt(e.target.value));
-                                                                            e.target.value = '';
-                                                                        }
-                                                                    }}
-                                                                    defaultValue=""
-                                                                >
-                                                                    <option value="">Gösterge Seçin...</option>
-                                                                    {selectedIndicators
-                                                                        .filter(ind => !subGroup.indicatorIds.includes(ind.indicatorId))
-                                                                        .map(ind => (
-                                                                            <option key={ind.indicatorId} value={ind.indicatorId}>
-                                                                                {ind.label}
-                                                                            </option>
-                                                                        ))
-                                                                    }
-                                                                </select>
-                                                            </div>
-                                                            <div className="selected-group-indicators">
-                                                                {subGroup.indicatorIds.map(indicatorId => {
-                                                                    const indicator = selectedIndicators.find(ind => ind.indicatorId === indicatorId);
-                                                                    return indicator ? (
-                                                                        <div key={indicatorId} className="mini-indicator-tag">
-                                                                            <span>{indicator.label}</span>
-                                                                            <button
-                                                                                type="button"
-                                                                                className="remove-indicator-btn"
-                                                                                onClick={() => handleRemoveIndicatorFromGroup(subIndex, indicatorId)}
-                                                                            >
-                                                                                ×
-                                                                            </button>
-                                                                        </div>
-                                                                    ) : null;
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
+                                                ) : null;
                                             })}
                                         </div>
-                                    );
-                                })
-                            }
+                                    </div>
+                                </div>
+                            ))}
                             
                             {/* Eğer hiç grup yoksa bilgilendirme */}
                             {chartGroups.length === 0 && (
                                 <div className="no-groups-info">
-                                    <p>Henüz grup eklenmemiş. Yukarıdaki "Ekle" butonuna tıklayarak ana grup oluşturun.</p>
+                                    <p>Henüz grup eklenmemiş. Yukarıdaki "Grup Ekle" butonuna tıklayarak grup oluşturun.</p>
                                     <p><strong>Örnek kullanım:</strong></p>
                                     <ul>
-                                        <li><strong>Ana Grup:</strong> "Ulusal Dergi Yayın Grubu" (renk: mavi)</li>
-                                        <li><strong>Alt Grup:</strong> "Tıp Fakültesi", "Diş Hekimliği Fakültesi" vb.</li>
+                                        <li><strong>Renk Grubu:</strong> "Ulusal Dergi Yayın Grubu" - tüm göstergeler aynı renkte görünür</li>
+                                        <li><strong>İsim Grubu:</strong> "Fakülteler" - X-axis'te bu isim altında gruplandırılır</li>
                                     </ul>
                                 </div>
                             )}

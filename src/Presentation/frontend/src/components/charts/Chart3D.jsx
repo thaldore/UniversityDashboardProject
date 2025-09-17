@@ -214,19 +214,15 @@ function Grid({ metrics }) {
 }
 
 // X-axis labels component
-function XAxisLabels({ labels, metrics, totalBars, groupSize }) {
+function XAxisLabels({ labels, metrics }) {
     const { chartWidth, chartDepth } = metrics;
-    const useGrouping = groupSize && totalBars && groupSize > 0 && labels && labels.length > 0 && labels.length * groupSize === totalBars;
-    const barSpacing = chartWidth / ((useGrouping ? totalBars : labels.length) + 1);
-
+    
     return (
         <group>
             {(labels || []).map((label, index) => {
-                let centerIndex = index;
-                if (useGrouping) {
-                    centerIndex = index * groupSize + (groupSize - 1) / 2;
-                }
-                const posX = -chartWidth / 2 + barSpacing * (centerIndex + 1);
+                // Her grup ortasında label konumlandır
+                const groupWidth = chartWidth / labels.length;
+                const posX = -chartWidth / 2 + (index * groupWidth) + (groupWidth / 2);
                 const display = label.replace(/\s*-\s*(Güncel|Geçmiş)\s*Dönem.*$/, '').trim();
                 return (
                     <Text
@@ -298,8 +294,13 @@ function Tooltip({ visible, position, content }) {
             }}
         >
             <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                {content.label}
+                {content.datasetLabel || content.label}
             </div>
+            {content.datasetLabel && (
+                <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
+                    Kategori: {content.label}
+                </div>
+            )}
             <div style={{ color: '#666' }}>
                 Değer: <span style={{ fontWeight: '600', color: '#333' }}>{content.value}</span>
             </div>
@@ -357,7 +358,7 @@ function Legend({ datasets, colors }) {
 }
 
 // Main Chart3D component with image-matching design
-export default function Chart3D({ data, options = {}, legendItems, groupLabels, groupSize }) {
+export default function Chart3D({ data, options = {}, legendItems, groupLabels }) {
     const [hoveredBar, setHoveredBar] = useState(null);
     const [tooltip, setTooltip] = useState({ visible: false, position: { x: 0, y: 0 }, content: null });
     const canvasRef = useRef();
@@ -385,7 +386,9 @@ export default function Chart3D({ data, options = {}, legendItems, groupLabels, 
         
     const bars = [];
     const colors = [];
-    const maxValue = Math.max(...data.datasets.flatMap(d => d.data));
+    // Null olmayan değerlerden maxValue hesapla
+    const validValues = data.datasets.flatMap(d => d.data.filter(val => val !== null && val !== undefined && val !== 0));
+    const maxValue = validValues.length > 0 ? Math.max(...validValues) : 1;
 
     // Dinamik ölçüler: label sayısına göre genişlik ve derinlik
     const labelCount = Math.max(1, data.labels.length);
@@ -400,22 +403,53 @@ export default function Chart3D({ data, options = {}, legendItems, groupLabels, 
         console.log('Chart3D datasets:', data.datasets);
         console.log('Chart3D labels:', data.labels);
         
+        // Her label için kaç aktif dataset olduğunu hesapla
+        const activeDatasetsPerLabel = data.labels.map((_, labelIndex) => {
+            return data.datasets.filter(dataset => {
+                const value = dataset.data[labelIndex];
+                return value !== null && value !== undefined && value !== 0;
+            }).length;
+        });
+        const maxActiveDatasets = Math.max(...activeDatasetsPerLabel);
+        console.log('Active datasets per label:', activeDatasetsPerLabel);
+        console.log('Max active datasets:', maxActiveDatasets);
+        
         data.datasets.forEach((dataset, datasetIndex) => {
             dataset.data.forEach((value, labelIndex) => {
-                // Her indicator için doğru renk (Chart.js backgroundColor'dan al)
-                const color = dataset.backgroundColor && Array.isArray(dataset.backgroundColor) 
-                    ? dataset.backgroundColor[labelIndex] || defaultColors[labelIndex % defaultColors.length]
-                    : defaultColors[labelIndex % defaultColors.length];
+                // Null veya undefined değerleri atla
+                if (value === null || value === undefined || value === 0) {
+                    return;
+                }
+                
+                // Dataset'in kendi rengi varsa onu kullan, yoksa default'tan al
+                const color = dataset.backgroundColor || defaultColors[datasetIndex % defaultColors.length];
                 
                 colors.push(color);
                 
                 const normalizedHeight = (value / maxValue) * 4; // Scale to max height of 4 units
-                const barSpacing = chartWidth / (data.labels.length + 1);
-                const barXZ = Math.max(0.5, Math.min(0.9, 8 / chartWidth));
+                
+                // Yan yana sütunlar için pozisyon hesaplama - gerçek aktif dataset sayısını kullan
+                const activeDatasetsForThisLabel = activeDatasetsPerLabel[labelIndex];
+                const groupWidth = chartWidth / labelCount; // Her grup için ayrılan genişlik
+                const barWidth = groupWidth / (activeDatasetsForThisLabel + 1); // Her bar'ın genişliği (padding ile)
+                const groupStartX = -chartWidth/2 + (labelIndex * groupWidth);
+                
+                // Bu label için aktif dataset'lerin sıralamasını bul
+                let activeDatasetIndex = 0;
+                for (let i = 0; i < datasetIndex; i++) {
+                    const val = data.datasets[i].data[labelIndex];
+                    if (val !== null && val !== undefined && val !== 0) {
+                        activeDatasetIndex++;
+                    }
+                }
+                
+                const barX = groupStartX + barWidth * (activeDatasetIndex + 1);
+                
+                const barXZ = Math.max(0.3, Math.min(0.7, barWidth * 0.8)); // Bar kalınlığı
                 
                 bars.push({
                     position: [
-                        -chartWidth/2 + barSpacing * (labelIndex + 1), 
+                        barX, 
                         normalizedHeight / 2, 
                         0
                     ],
@@ -447,7 +481,8 @@ export default function Chart3D({ data, options = {}, legendItems, groupLabels, 
             },
             content: {
                 label: bar.label,
-                value: bar.value
+                value: bar.value,
+                datasetLabel: bar.datasetLabel
             }
         });
     };
@@ -538,8 +573,6 @@ export default function Chart3D({ data, options = {}, legendItems, groupLabels, 
                         <XAxisLabels 
                             labels={groupLabels || (data?.labels || [])} 
                             metrics={preparedData.metrics} 
-                            totalBars={(preparedData?.bars || []).length}
-                            groupSize={groupSize}
                         />
                         <YAxisScale maxValue={preparedData.maxValue} metrics={preparedData.metrics} />
                         

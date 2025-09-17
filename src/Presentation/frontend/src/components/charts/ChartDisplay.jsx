@@ -7,7 +7,94 @@ import { Bar, Pie, Line } from 'react-chartjs-2';
 import Chart3D from './Chart3D';
 import ChartDifference3D from './ChartDifference3D';
 
-// Register Chart.js components
+// Custom plugin: Per-category dynamic bar compaction for NameGroup charts
+// Amaç: Her kategori (X ekseni label) için NULL olan sütun slotlarını yok sayıp
+// kalan barları kategori genişliği içinde yeniden dağıtarak Column3D benzeri
+// boşluksuz görüntü sağlamak.
+const DynamicCategoryCompactionPlugin = {
+    id: 'dynamicCategoryCompaction',
+    beforeDatasetsDraw(chart) {
+        const pluginOpts = chart.options?.plugins?.dynamicCategoryCompaction;
+        if (!pluginOpts || !pluginOpts.enabled) return;
+        const xScale = chart.scales?.x;
+        if (!xScale) return;
+        const metas = chart.getSortedVisibleDatasetMetas();
+        if (!metas.length) return;
+        const tickCount = xScale.ticks.length;
+        if (!tickCount) return;
+
+        // Kategori genişliği hesaplama: ardışık iki tick farkı; son çare ortalama genişlik
+        let fullCategoryWidth;
+        if (tickCount > 1) {
+            const first = xScale.getPixelForTick(0);
+            const second = xScale.getPixelForTick(1);
+            fullCategoryWidth = Math.abs(second - first);
+        } else {
+            fullCategoryWidth = xScale.width / tickCount;
+        }
+
+        const categoryPaddingRatio = pluginOpts.categoryPaddingRatio ?? 0.12;
+        const innerGapRatio = pluginOpts.innerGapRatio ?? 0.1;
+        const baseCategoryPct = pluginOpts.baseCategoryPercentage ?? 0.9;
+
+        // Non-null counts (önceden sağlanmışsa kullan)
+        let nonNullCounts = pluginOpts.nonNullDatasetCounts;
+        if (!nonNullCounts) {
+            nonNullCounts = new Array(tickCount).fill(0);
+            for (let i = 0; i < tickCount; i++) {
+                metas.forEach(meta => {
+                    const ds = meta._dataset || meta.dataset || {};
+                    const val = ds.data?.[i];
+                    if (val !== null && val !== undefined && val !== 0) {
+                        nonNullCounts[i]++;
+                    }
+                });
+            }
+        }
+
+        for (let ti = 0; ti < tickCount; ti++) {
+            const active = [];
+            metas.forEach(meta => {
+                const elem = meta.data[ti];
+                if (!elem) return;
+                const v = meta._dataset?.data?.[ti];
+                if (v !== null && v !== undefined && v !== 0) {
+                    active.push(elem);
+                } else {
+                    // Görünmez yap
+                    elem.width = 0;
+                }
+            });
+            const c = active.length;
+            if (!c) continue;
+            const centerX = xScale.getPixelForTick(ti);
+            const outerWidth = fullCategoryWidth * baseCategoryPct;
+            const effectiveWidth = outerWidth * (1 - categoryPaddingRatio);
+            const totalGap = c > 1 ? effectiveWidth * innerGapRatio : 0;
+            const gapEach = c > 1 ? totalGap / (c - 1) : 0;
+            const barTotal = effectiveWidth - totalGap;
+            let barWidth = barTotal / c;
+            // Minimum / maksimum sınırlar + tek bar özel genişliği
+            barWidth = Math.max(pluginOpts.minBarWidth ?? 6, barWidth);
+            barWidth = Math.min(pluginOpts.maxBarWidth ?? 70, barWidth);
+            if (c === 1 && pluginOpts.maxSingleBarWidth) {
+                // Tek bar varsa biraz daha büyüt ama üst sınırı aşmadan
+                const expanded = barWidth * (pluginOpts.singleBarScale ?? 1.4);
+                barWidth = Math.min(expanded, pluginOpts.maxSingleBarWidth);
+            }
+            // Kümeyi (yalnızca aktif barları) gerçek toplam genişliği ile tam merkeze hizala
+            const clusterWidth = (c * barWidth) + (c > 1 ? (c - 1) * gapEach : 0);
+            const clusterStart = centerX - (clusterWidth / 2);
+            active.forEach((barEl, idx) => {
+                const barLeft = clusterStart + idx * (barWidth + gapEach);
+                barEl.width = barWidth;
+                barEl.x = barLeft + barWidth / 2;
+            });
+        }
+    }
+};
+
+// Register Chart.js components & custom plugin
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -17,7 +104,8 @@ ChartJS.register(
     Legend,
     ArcElement,
     LineElement,
-    PointElement
+    PointElement,
+    DynamicCategoryCompactionPlugin
 );
 
 const ChartDisplay = ({ chart }) => {
@@ -284,144 +372,287 @@ const ChartDisplay = ({ chart }) => {
     const formatGroupedChartData = (data) => {
         console.log('formatGroupedChartData - received data:', data.currentData);
         
-        // Veriyi alt gruplara göre gruplandır
-        const groupedIndicators = {};
+        // Veriyi hem isim hem renk gruplarına göre analiz et
+        const nameGroups = new Map(); // isim grubu -> göstergeler
+        const colorGroups = new Map(); // renk grubu -> göstergeler  
         const ungroupedIndicators = [];
         
+        // Tüm göstergeleri gruplarına ayır
         data.currentData.forEach(item => {
-            const hasSubGroup = item.additionalData?.HasSubGroup;
-            const groupName = item.additionalData?.GroupName;
+            const hasNameGroup = item.additionalData?.HasNameGroup;
+            const nameGroupName = item.additionalData?.NameGroupName;
+            const hasColorGroup = item.additionalData?.HasColorGroup;
+            const colorGroupName = item.additionalData?.ColorGroupName;
             
-            if (hasSubGroup && groupName) {
-                // Alt grupta olan göstergeler
-                if (!groupedIndicators[groupName]) {
-                    groupedIndicators[groupName] = [];
+            // İsim grup kontrol
+            if (hasNameGroup && nameGroupName) {
+                if (!nameGroups.has(nameGroupName)) {
+                    nameGroups.set(nameGroupName, []);
                 }
-                groupedIndicators[groupName].push(item);
+                nameGroups.get(nameGroupName).push(item);
             } else {
-                // Alt grupta olmayan göstergeler
+                // İsim grubunda olmayan göstergeler
                 ungroupedIndicators.push(item);
+            }
+            
+            // Renk grup kontrol (isim grubundan bağımsız)
+            if (hasColorGroup && colorGroupName) {
+                if (!colorGroups.has(colorGroupName)) {
+                    colorGroups.set(colorGroupName, []);
+                }
+                colorGroups.get(colorGroupName).push(item);
             }
         });
         
-        console.log('Grouped indicators:', groupedIndicators);
+        console.log('Name groups:', nameGroups);
+        console.log('Color groups:', colorGroups);
         console.log('Ungrouped indicators:', ungroupedIndicators);
         
-        // X ekseni label'larını oluştur
-        const labels = [];
+        // X ekseni label'larını oluştur (proportional kategoriler için)
+        const categories = [];
         
-        // Alt grup isimlerini ekle
-        Object.keys(groupedIndicators).forEach(groupName => {
-            labels.push(groupName);
-        });
+        // Eğer isim grupları varsa, isim gruplarını kullan
+        if (nameGroups.size > 0) {
+            // İsim grup isimlerini ekle - sadece valid data olan grupları
+            nameGroups.forEach((indicators, groupName) => {
+                // Bu grupta en az bir valid değer var mı kontrol et
+                const hasValidData = indicators.some(indicator => 
+                    indicator.value !== null && indicator.value !== undefined && indicator.value !== 0
+                );
+                
+                if (hasValidData) {
+                    categories.push({
+                        type: 'nameGroup',
+                        label: groupName,
+                        indicators: indicators,
+                        indicatorCount: indicators.length
+                    });
+                } else {
+                    console.log(`Skipping empty name group: ${groupName}`);
+                }
+            });
+            
+            // Gruplanmamış gösterge isimlerini ekle - sadece valid data olanları
+            ungroupedIndicators.forEach(item => {
+                if (item.value !== null && item.value !== undefined && item.value !== 0) {
+                    categories.push({
+                        type: 'individual',
+                        label: item.label,
+                        indicators: [item],
+                        indicatorCount: 1
+                    });
+                } else {
+                    console.log(`Skipping empty ungrouped indicator: ${item.label}`);
+                }
+            });
+        } else {
+            // İsim grubu yoksa, tüm göstergeleri tek tek ekle (sadece renk grupları durumu) - sadece valid olanları
+            data.currentData.forEach(item => {
+                if (item.value !== null && item.value !== undefined && item.value !== 0) {
+                    categories.push({
+                        type: 'individual',
+                        label: item.label,
+                        indicators: [item],
+                        indicatorCount: 1
+                    });
+                } else {
+                    console.log(`Skipping empty indicator: ${item.label}`);
+                }
+            });
+        }
         
-        // Gruplanmamış gösterge isimlerini ekle
-        ungroupedIndicators.forEach(item => {
-            labels.push(item.label);
-        });
+        console.log('Categories for proportional sizing:', categories);
         
-        console.log('X-axis labels:', labels);
+        // Toplam gösterge sayısını hesapla (proportional sizing için)
+        const totalIndicatorCount = categories.reduce((sum, cat) => sum + cat.indicatorCount, 0);
+        
+        // X ekseni labels (chart.js için sadece string array)
+        const labels = categories.map(cat => cat.label);
         
         // Dataset'leri oluştur - her gösterge ayrı dataset olacak
         const datasets = [];
         const processedIndicators = new Set();
         
-        // Alt gruplardaki göstergeleri işle
-        Object.values(groupedIndicators).forEach(groupItems => {
-            groupItems.forEach(item => {
-                if (!processedIndicators.has(item.additionalData?.IndicatorId)) {
-                    processedIndicators.add(item.additionalData?.IndicatorId);
-                    
-                    // Bu gösterge için tüm label'lardaki değerleri oluştur
-                    const dataValues = labels.map(label => {
-                        // Ana grup gizli mi kontrol et
-                        const parentGroupId = item.additionalData?.ParentGroupId;
-                        if (parentGroupId && hiddenGroups.includes(parentGroupId)) {
-                            return 0; // Ana grup gizli ise değer gösterme
-                        }
-                        
-                        // Bu label'da bu gösterge var mı?
-                        if (groupedIndicators[label] && groupedIndicators[label].some(gi => gi.additionalData?.IndicatorId === item.additionalData?.IndicatorId)) {
-                            const matchingItem = groupedIndicators[label].find(gi => gi.additionalData?.IndicatorId === item.additionalData?.IndicatorId);
-                            return matchingItem ? matchingItem.value : 0;
-                        } else if (ungroupedIndicators.some(ui => ui.label === label && ui.additionalData?.IndicatorId === item.additionalData?.IndicatorId)) {
-                            const matchingItem = ungroupedIndicators.find(ui => ui.label === label && ui.additionalData?.IndicatorId === item.additionalData?.IndicatorId);
-                            return matchingItem ? matchingItem.value : 0;
-                        }
-                        return 0; // Bu label'da bu gösterge yok
-                    });
-                    
-                    datasets.push({
-                        label: item.additionalData?.IndicatorName || item.label,
-                        data: dataValues,
-                        backgroundColor: item.color,
-                        borderColor: item.color,
-                        borderWidth: 1
-                    });
-                }
-            });
-        });
-        
-        // Gruplanmamış göstergeleri işle
-        ungroupedIndicators.forEach(item => {
+        // Tüm göstergeleri işle
+        data.currentData.forEach(item => {
             if (!processedIndicators.has(item.additionalData?.IndicatorId)) {
                 processedIndicators.add(item.additionalData?.IndicatorId);
                 
-                // Ana grup gizli mi kontrol et
-                const parentGroupId = item.additionalData?.ParentGroupId;
-                const isHidden = parentGroupId && hiddenGroups.includes(parentGroupId);
-                
-                const dataValues = labels.map(label => {
-                    if (isHidden) {
-                        return 0; // Ana grup gizli ise değer gösterme
+                // Bu gösterge için tüm kategorideki değerleri oluştur
+                const dataValues = categories.map(category => {
+                    // Ana grup gizli mi kontrol et  
+                    const colorGroupId = item.additionalData?.ColorGroupId;
+                    if (colorGroupId && hiddenGroups.includes(colorGroupId)) {
+                        return null; // Renk grubu gizli ise null döndür
                     }
-                    return label === item.label ? item.value : 0;
+                    
+                    // Bu kategoride bu gösterge var mı kontrol et
+                    const isInThisCategory = category.indicators.some(catItem => 
+                        catItem.additionalData?.IndicatorId === item.additionalData?.IndicatorId
+                    );
+                    
+                    if (isInThisCategory) {
+                        const matchingItem = category.indicators.find(catItem => 
+                            catItem.additionalData?.IndicatorId === item.additionalData?.IndicatorId
+                        );
+                        return matchingItem ? matchingItem.value : null;
+                    }
+                    
+                    return null; // Bu kategoride bu gösterge yok
                 });
+                
+                // Tamamen null olan dataset'leri filtrele
+                const hasAnyData = dataValues.some(value => value !== null && value !== undefined && value !== 0);
+                if (!hasAnyData) {
+                    console.log(`Skipping indicator ${item.label} - no valid data`);
+                    return; // Bu göstergeyi atla
+                }
+                
+                // Renk grubuna göre renk belirle
+                const colorGroupId = item.additionalData?.ColorGroupId;
+                let itemColor = item.color; // Varsayılan renk
+                
+                console.log(`Indicator: ${item.label}, ColorGroupId: ${colorGroupId}, HasColorGroup: ${item.additionalData?.HasColorGroup}, ColorGroupColor: ${item.additionalData?.ColorGroupColor}, HasData: ${hasAnyData}`);
+                
+                // Eğer color group varsa, color group'un rengini kullan  
+                if (colorGroupId && colorGroupId > 0) {
+                    itemColor = item.additionalData?.ColorGroupColor || item.color;
+                    console.log(`Using color group color: ${itemColor} for indicator: ${item.label}`);
+                } else {
+                    console.log(`Using default color: ${itemColor} for indicator: ${item.label}`);
+                }
                 
                 datasets.push({
                     label: item.additionalData?.IndicatorName || item.label,
                     data: dataValues,
-                    backgroundColor: item.color,
-                    borderColor: item.color,
-                    borderWidth: 1
+                    backgroundColor: itemColor,
+                    borderColor: itemColor,
+                    borderWidth: 1,
+                    // Gösterge metadata'sı
+                    _indicatorId: item.additionalData?.IndicatorId,
+                    _colorGroupId: colorGroupId
                 });
             }
         });
         
-        console.log('formatGroupedChartData - result:', { labels, datasets });
+        // Null olmayan dataset sayılarını hesapla (proportional sizing için)
+        const nonNullDatasetCounts = labels.map((_, labelIndex) => {
+            return datasets.filter(dataset => {
+                const value = dataset.data[labelIndex];
+                return value !== null && value !== undefined && value !== 0;
+            }).length;
+        });
+        const maxNonNullDatasets = Math.max(...nonNullDatasetCounts);
+        const avgNonNullDatasets = nonNullDatasetCounts.reduce((a, b) => a + b, 0) / nonNullDatasetCounts.length;
+        
+        console.log('formatGroupedChartData - result:', { labels, datasets, categories });
+        console.log('Non-null dataset counts per label:', nonNullDatasetCounts);
+        console.log('Max non-null datasets:', maxNonNullDatasets, 'Average:', avgNonNullDatasets);
 
         return {
             labels,
-            datasets
+            datasets,
+            _chartMetadata: {
+                categories,
+                totalIndicatorCount,
+                proportionalSizing: true,
+                nonNullDatasetCounts,
+                maxNonNullDatasets,
+                avgNonNullDatasets
+            }
         };
     };
 
-    // Göstergenin hangi gruba ait olduğunu bul (hiyerarşik arama)
-    const findOwningGroup = (groups, indicatorId) => {
-        for (const group of groups) {
-            // Direkt bu grupta mı?
-            if ((group.indicators || []).some(gi => gi.indicatorId === indicatorId)) {
-                return group;
-            }
+    const getChartOptions = (chartData) => {
+        // Grup analizi
+        const hasColorGroups = chartDetails.groups && chartDetails.groups.some(g => g.groupType === 1); // ColorGroup
+        const hasNameGroups = chartDetails.groups && chartDetails.groups.some(g => g.groupType === 2); // NameGroup  
+        const isGroupedChart = chartDetails.groups && chartDetails.groups.length > 0;
+        
+        // Default değerler (gruplandırılmamış grafikler için)
+        let categoryPercentage = 0.8;
+        let barPercentage = 0.9;
+        let barThickness = null; // Auto sizing
+        
+        console.log('Group analysis:', { hasColorGroups, hasNameGroups, isGroupedChart });
+        
+        // Proportional sizing şartları:
+        // 1. Sadece NameGroup varsa -> agresif proportional sizing
+        // 2. Sadece ColorGroup varsa -> normal spacing (her gösterge ayrı sütun)  
+        // 3. Both varsa -> agresif proportional sizing (NameGroup mantığı)
+        // 1. Sadece NameGroup varsa -> agresif proportional sizing
+        // 2. Sadece ColorGroup varsa -> normal spacing (her gösterge ayrı sütun)  
+        // 3. Both varsa -> agresif proportional sizing (NameGroup mantığı)
+        if (hasNameGroups) {
+            // NameGroup var (tek başına veya ColorGroup ile birlikte) - agresif proportional sizing
+            const chartMetadata = chartData?._chartMetadata;
             
-            // Alt gruplarda mı?
-            if (group.childGroups && group.childGroups.length > 0) {
-                const foundInChild = findOwningGroup(group.childGroups, indicatorId);
-                if (foundInChild) return foundInChild;
+            if (chartMetadata && chartMetadata.proportionalSizing) {
+                const maxDatasets = chartMetadata.maxNonNullDatasets || 1;
+                const avgDatasets = chartMetadata.avgNonNullDatasets || 1;
+                
+                // Agresif proportional sizing - Column3D benzeri
+                categoryPercentage = Math.min(0.98, Math.max(0.3, 0.2 + (maxDatasets * 0.15)));
+                barPercentage = Math.min(0.95, Math.max(0.4, 0.3 + (avgDatasets * 0.2)));
+                
+                if (avgDatasets < 2) {
+                    categoryPercentage = Math.min(0.95, categoryPercentage + 0.2);
+                    barPercentage = Math.min(0.9, barPercentage + 0.15);
+                }
+                
+                barThickness = Math.max(15, Math.min(50, 80 / maxDatasets));
+                
+                console.log('NameGroup chart - Aggressive sizing:', { maxDatasets, avgDatasets, categoryPercentage, barPercentage, barThickness });
             }
+        } else if (hasColorGroups) {
+            // Sadece ColorGroup var - normal spacing (her gösterge ayrı sütun)
+            categoryPercentage = 0.8;
+            barPercentage = 0.9; 
+            barThickness = null; // Auto sizing
+            
+            console.log('ColorGroup only - Normal spacing');
+        } else {
+            console.log('No groups - Default spacing');
         }
-        return null;
-    };
-
-    const getChartOptions = () => {
+        
         const baseOptions = {
             responsive: true,
             maintainAspectRatio: false,
+            // Dataset-specific sizing
+            datasets: {
+                bar: {
+                    // Manuel bar thickness sadece gruplandırılmış grafiklerde
+                    ...(barThickness ? { barThickness: barThickness } : {}),
+                    categoryPercentage: categoryPercentage,
+                    barPercentage: barPercentage
+                }
+            },
+            // Proportional column sizing için ayarlar
+            scales: {
+                x: {
+                    type: 'category',
+                    // Dinamik proportional sizing
+                    categoryPercentage: categoryPercentage,
+                    barPercentage: barPercentage,
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 0
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                }
+            },
             plugins: {
                 legend: {
                     position: 'top',
                     display: true,
-                    // Show legend when there are multiple datasets (historical data)
                     labels: {
                         usePointStyle: true,
                         padding: 20
@@ -435,7 +666,16 @@ const ChartDisplay = ({ chart }) => {
                         label: (context) => {
                             const value = context.parsed.y || context.parsed;
                             const datasetLabel = context.dataset.label || '';
-                            const indicatorName = chartData?.indicatorNames?.[context.dataIndex] || context.label;
+                            const categoryLabel = context.label || '';
+                            
+                            // Gruplandırılmış grafiklerde tooltip formatı
+                            if (isGroupedChart) {
+                                // Gösterge adı (dataset label) ve değer
+                                return `${datasetLabel}: ${value}`;
+                            }
+                            
+                            // Normal grafik durumu
+                            const indicatorName = chartData?.indicatorNames?.[context.dataIndex] || categoryLabel;
                             
                             // If historical data is shown in chart, include period info
                             if (chartDetails.showHistoricalInChart && datasetLabel) {
@@ -443,32 +683,45 @@ const ChartDisplay = ({ chart }) => {
                             }
                             
                             return `${indicatorName}: ${value}`;
+                        },
+                        title: (context) => {
+                            // Gruplandırılmış grafiklerde kategori adını title olarak göster
+                            if (isGroupedChart) {
+                                return context[0]?.label || '';
+                            }
+                            
+                            // Normal grafik durumu - varsayılan title
+                            return context[0]?.label || '';
                         }
                     }
                 }
             }
         };
 
-        // Gruplandırılmış tek dataset durumunda legend'ı ana grupları gösterecek şekilde oluştur
-        if (chartDetails.groups && chartDetails.groups.length > 0) {
+        // ColorGroup legend sistemi - sadece renk grupları varsa göster
+        if (hasColorGroups) {
             baseOptions.plugins.legend = {
                 display: true,
                 onClick: (e, legendItem) => {
                     const groupId = legendItem?.__groupId;
                     if (!groupId) return;
-                    setHiddenGroups(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]);
+                    setHiddenGroups(prev => 
+                        prev.includes(groupId) 
+                            ? prev.filter(id => id !== groupId) 
+                            : [...prev, groupId]
+                    );
                 },
                 labels: {
                     usePointStyle: true,
-                    pointStyle: 'circle',
+                    pointStyle: 'circle', 
                     color: '#555',
                     generateLabels: () => {
                         const legendItems = [];
                         
-                        // Sadece ana grupları (ColorGroup) legend'da göster
-                        const mainGroups = (chartDetails.groups || []).filter(group => group.groupType === 1); // ColorGroup
+                        // Renk gruplarını legend'da göster
+                        const colorGroups = (chartDetails.groups || []).filter(group => group.groupType === 1); // ColorGroup
                         
-                        mainGroups.forEach(group => {
+                        colorGroups.forEach(group => {
                             const hidden = hiddenGroups.includes(group.groupId);
                             legendItems.push({
                                 text: group.groupName,
@@ -487,38 +740,21 @@ const ChartDisplay = ({ chart }) => {
             };
         }
 
-        // Chart type specific options
-        switch (chart.chartType) {
-            case ChartType.PieChart:
-                return {
-                    ...baseOptions,
-                    plugins: {
-                        ...baseOptions.plugins,
-                        tooltip: {
-                            callbacks: {
-                                label: (context) => {
-                                    const value = context.parsed;
-                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = ((value / total) * 100).toFixed(1);
-                                    const indicatorName = chartData?.indicatorNames?.[context.dataIndex] || context.label;
-                                    return `${indicatorName}: ${value} (${percentage}%)`;
-                                }
-                            }
-                        }
-                    }
-                };
-            case ChartType.ColumnChart:
-                return {
-                    ...baseOptions,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                        }
-                    }
-                };
-            default:
-                return baseOptions;
-        }
+        // Dinamik kompaksiyon plugin konfigürasyonu (yalnızca NameGroup içeren durumlar için)
+        if (!baseOptions.plugins) baseOptions.plugins = {};
+        baseOptions.plugins.dynamicCategoryCompaction = hasNameGroups ? {
+            enabled: true,
+            nonNullDatasetCounts: chartData?._chartMetadata?.nonNullDatasetCounts,
+            baseCategoryPercentage: categoryPercentage,
+            categoryPaddingRatio: 0.12,
+            innerGapRatio: 0.10,
+            minBarWidth: 8,
+            maxBarWidth: 110,          // önceki 80 yerine artırıldı
+            maxSingleBarWidth: 160,     // tek bar durumunda izin verilen üst genişlik
+            singleBarScale: 1.5         // tek barı ekstra büyütme çarpanı
+        } : { enabled: false };
+
+        return baseOptions;
     };
 
     const renderChart = () => {
@@ -544,19 +780,37 @@ const ChartDisplay = ({ chart }) => {
             );
         }
 
-        const options = getChartOptions();
+        const options = getChartOptions(data);
 
         // Add note if historical data is shown in chart - REMOVED
         const historicalNote = null;
 
         switch (chart.chartType) {
-            case ChartType.PieChart:
+            case ChartType.PieChart: {
+                // Pie chart için özel grup handling
+                let pieData = data;
+                if (chartDetails.groups && chartDetails.groups.length > 0) {
+                    // Gruplandırılmış pie chart - tek pie, renkleri grup renklerine göre
+                    pieData = {
+                        labels: data.labels,
+                        datasets: [{
+                            label: chartDetails.title,
+                            data: data.datasets.map(dataset => 
+                                dataset.data.find(value => value !== null && value !== undefined) || 0
+                            ),
+                            backgroundColor: data.datasets.map(dataset => dataset.backgroundColor),
+                            borderColor: data.datasets.map(dataset => dataset.borderColor),
+                            borderWidth: 1
+                        }]
+                    };
+                }
                 return (
                     <div className="chart-container">
                         {historicalNote}
-                        <Pie data={data} options={options} height={300} />
+                        <Pie data={pieData} options={options} height={300} />
                     </div>
                 );
+            }
             case ChartType.ColumnChart:
                 return (
                     <div className="chart-container">
@@ -571,13 +825,24 @@ const ChartDisplay = ({ chart }) => {
                         <Line data={data} options={options} height={300} />
                     </div>
                 );
-            case ChartType.Column3D:
+            case ChartType.Column3D: {
+                // Legend items'ı dataset'lerden oluştur
+                const legendItems = data.datasets?.map(dataset => ({
+                    label: dataset.label,
+                    color: dataset.backgroundColor
+                })) || [];
+                
                 return (
                     <div className="chart-container">
                         {historicalNote}
-                        <Chart3D data={data} options={options} />
+                        <Chart3D 
+                            data={data} 
+                            options={options} 
+                            legendItems={legendItems}
+                        />
                     </div>
                 );
+            }
             case ChartType.Difference3D:
                 return (
                     <div className="chart-container">
