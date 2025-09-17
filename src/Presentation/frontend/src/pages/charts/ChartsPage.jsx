@@ -7,7 +7,7 @@ import ErrorBoundary from '../../components/common/ErrorBoundary';
 import ChartSectionManager from '../../components/charts/ChartSectionManager';
 import ChartManager from '../../components/charts/ChartManager';
 import ChartDisplay from '../../components/charts/ChartDisplay';
-import { PlusIcon, SettingsIcon } from '../../components/common/Icons';
+import { PlusIcon, SettingsIcon, ChevronDownIcon, ChevronRightIcon } from '../../components/common/Icons';
 import '../../styles/pages/charts.css';
 
 const ChartsPage = () => {
@@ -24,6 +24,11 @@ const ChartsPage = () => {
     const [selectedSection, setSelectedSection] = useState(null);
     const [selectedChart, setSelectedChart] = useState(null);
     const [editingSection, setEditingSection] = useState(null);
+    
+    // Hierarchical states
+    const [expandedSections, setExpandedSections] = useState(new Set());
+    const [loadingSections, setLoadingSections] = useState(new Set());
+    const [loadingCharts, setLoadingCharts] = useState(new Set());
 
     const isAdmin = user?.roles?.includes('Admin') || false;
 
@@ -31,86 +36,31 @@ const ChartsPage = () => {
         try {
             setLoading(true);
             
-            // Load chart sections
+            // Load only root level chart sections (without charts)
             const sectionsResponse = await chartService.getChartSections();
             const sectionsData = sectionsResponse.data || [];
             
             console.log('Raw sections data from API:', sectionsData);
             
-            // Map backend response to frontend format
+            // Map only root sections, don't preload subsections or charts
             const mappedSections = sectionsData.map(section => ({
                 id: section.sectionId,
                 title: section.sectionName || section.description || 'İsimsiz Başlık',
                 description: section.description,
-                parentSectionId: null, // Root sections
+                parentSectionId: null,
                 orderIndex: section.displayOrder,
                 chartCount: section.chartCount,
-                subSections: section.children?.map(child => ({
-                    id: child.sectionId,
-                    title: child.sectionName || child.description || 'İsimsiz Başlık', 
-                    description: child.description,
-                    parentSectionId: section.sectionId,
-                    orderIndex: child.displayOrder,
-                    chartCount: child.chartCount,
-                    subSections: child.children?.map(grandChild => ({
-                        id: grandChild.sectionId,
-                        title: grandChild.sectionName || grandChild.description || 'İsimsiz Başlık',
-                        description: grandChild.description,
-                        parentSectionId: child.sectionId,
-                        orderIndex: grandChild.displayOrder,
-                        chartCount: grandChild.chartCount,
-                        subSections: []
-                    })) || []
-                })) || []
+                hasSubSections: section.children && section.children.length > 0,
+                subSections: [], // We'll load these on demand
+                isExpanded: false,
+                isLoaded: false
             }));
             
-            console.log('Mapped sections for frontend:', mappedSections);
-            
-            // Force re-render by using functional state update
+            console.log('Mapped root sections for frontend:', mappedSections);
             setSections(() => mappedSections);
             
-            // Load charts for each section
-            const chartsData = {};
-            if (mappedSections && mappedSections.length > 0) {
-                for (const section of mappedSections) {
-                    try {
-                        const sectionCharts = await chartService.getChartsBySection(section.id);
-                        chartsData[section.id] = sectionCharts.data || [];
-                    } catch (err) {
-                        console.error(`Error loading charts for section ${section.id}:`, err);
-                        chartsData[section.id] = [];
-                    }
-                    
-                    // Also load charts for subsections
-                    if (section.subSections) {
-                        for (const subSection of section.subSections) {
-                            try {
-                                const subSectionCharts = await chartService.getChartsBySection(subSection.id);
-                                chartsData[subSection.id] = subSectionCharts.data || [];
-                            } catch (err) {
-                                console.error(`Error loading charts for subsection ${subSection.id}:`, err);
-                                chartsData[subSection.id] = [];
-                            }
-                            
-                            // Load charts for sub-subsections
-                            if (subSection.subSections) {
-                                for (const grandChild of subSection.subSections) {
-                                    try {
-                                        const grandChildCharts = await chartService.getChartsBySection(grandChild.id);
-                                        chartsData[grandChild.id] = grandChildCharts.data || [];
-                                    } catch (err) {
-                                        console.error(`Error loading charts for sub-subsection ${grandChild.id}:`, err);
-                                        chartsData[grandChild.id] = [];
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            console.log('Charts data loaded:', chartsData);
-            setCharts(() => chartsData);
+            // Clear charts - we'll load them on demand
+            setCharts({});
             
             // Load indicators for chart creation/editing
             if (isAdmin) {
@@ -153,6 +103,13 @@ const ChartsPage = () => {
         setEditingSection(null);
     };
 
+    const handleSectionDelete = async () => {
+        // Reload data but keep the modal open
+        await loadData();
+        // Don't close the modal for deletion
+        setEditingSection(null);
+    };
+
     const handleChartUpdate = async () => {
         await loadData();
         setShowChartManager(false);
@@ -186,19 +143,187 @@ const ChartsPage = () => {
         }
     };
 
+    // Load subsections and charts for a section when expanded
+    const loadSectionData = async (sectionId, sectionData) => {
+        try {
+            setLoadingSections(prev => new Set(prev).add(sectionId));
+            
+            // If section has subsections, load them from API
+            if (sectionData.hasSubSections && sectionData.subSections.length === 0) {
+                const sectionsResponse = await chartService.getChartSections();
+                const fullSectionData = sectionsResponse.data.find(s => s.sectionId === sectionId);
+                
+                if (fullSectionData && fullSectionData.children) {
+                    const mappedSubSections = fullSectionData.children.map(child => ({
+                        id: child.sectionId,
+                        title: child.sectionName || child.description || 'İsimsiz Başlık',
+                        description: child.description,
+                        parentSectionId: sectionId,
+                        orderIndex: child.displayOrder,
+                        chartCount: child.chartCount,
+                        hasSubSections: child.children && child.children.length > 0,
+                        subSections: [],
+                        isExpanded: false,
+                        isLoaded: false
+                    }));
+                    
+                    // Update sections with subsections
+                    setSections(prevSections => {
+                        return prevSections.map(section => 
+                            section.id === sectionId 
+                                ? { ...section, subSections: mappedSubSections, isLoaded: true }
+                                : section
+                        );
+                    });
+                }
+            }
+            
+            // Load charts for this section if not already loaded
+            if (!charts[sectionId]) {
+                try {
+                    const sectionCharts = await chartService.getChartsBySection(sectionId);
+                    setCharts(prev => ({
+                        ...prev,
+                        [sectionId]: sectionCharts.data || []
+                    }));
+                } catch (err) {
+                    console.error(`Error loading charts for section ${sectionId}:`, err);
+                    setCharts(prev => ({
+                        ...prev,
+                        [sectionId]: []
+                    }));
+                }
+            }
+            
+        } catch (err) {
+            console.error('Error loading section data:', err);
+            setError('Bölüm verileri yüklenirken bir hata oluştu.');
+        } finally {
+            setLoadingSections(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(sectionId);
+                return newSet;
+            });
+        }
+    };
+
+    // Toggle section expansion
+    const toggleSection = async (sectionId) => {
+        const section = sections.find(s => s.id === sectionId);
+        if (!section) return;
+        
+        if (!section.isExpanded) {
+            // Expanding - load data if needed
+            if (!section.isLoaded) {
+                await loadSectionData(sectionId, section);
+            }
+        }
+        
+        setExpandedSections(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(sectionId)) {
+                newSet.delete(sectionId);
+            } else {
+                newSet.add(sectionId);
+            }
+            return newSet;
+        });
+        
+        setSections(prevSections => {
+            return prevSections.map(section => 
+                section.id === sectionId 
+                    ? { ...section, isExpanded: !section.isExpanded }
+                    : section
+            );
+        });
+    };
+
+    // Toggle subsection expansion
+    const toggleSubSection = async (parentSectionId, subSectionId) => {
+        const parentSection = sections.find(s => s.id === parentSectionId);
+        if (!parentSection) return;
+        
+        const subSection = parentSection.subSections.find(s => s.id === subSectionId);
+        if (!subSection) return;
+        
+        if (!subSection.isExpanded) {
+            // Load charts for subsection if not already loaded
+            if (!charts[subSectionId]) {
+                setLoadingCharts(prev => new Set(prev).add(subSectionId));
+                try {
+                    const subSectionCharts = await chartService.getChartsBySection(subSectionId);
+                    setCharts(prev => ({
+                        ...prev,
+                        [subSectionId]: subSectionCharts.data || []
+                    }));
+                } catch (err) {
+                    console.error(`Error loading charts for subsection ${subSectionId}:`, err);
+                    setCharts(prev => ({
+                        ...prev,
+                        [subSectionId]: []
+                    }));
+                } finally {
+                    setLoadingCharts(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(subSectionId);
+                        return newSet;
+                    });
+                }
+            }
+        }
+        
+        setSections(prevSections => {
+            return prevSections.map(section => 
+                section.id === parentSectionId 
+                    ? {
+                        ...section,
+                        subSections: section.subSections.map(subSection => 
+                            subSection.id === subSectionId 
+                                ? { ...subSection, isExpanded: !subSection.isExpanded }
+                                : subSection
+                        )
+                    }
+                    : section
+            );
+        });
+    };
+
     const renderSection = (section, level = 0) => {
         console.log(`Rendering section at level ${level}:`, section);
         const sectionCharts = charts[section.id] || [];
-        const hasSubSections = section.subSections && section.subSections.length > 0;
+        const hasSubSections = section.hasSubSections || (section.subSections && section.subSections.length > 0);
+        const isExpanded = section.isExpanded || expandedSections.has(section.id);
+        const isLoadingSection = loadingSections.has(section.id);
 
         return (
             <div key={`section-${section.id}`} className={`chart-section level-${level}`}>
-                <div className="section-header">
-                    <h3 className={`section-title level-${level}`}>
-                        {section.title}
-                    </h3>
+                <div className="section-header" onClick={() => level === 0 ? toggleSection(section.id) : null}>
+                    <div className="section-title-container">
+                        {/* Always show expand button for level 0 sections */}
+                        {level === 0 && (
+                            <button 
+                                className="expand-button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleSection(section.id);
+                                }}
+                                disabled={isLoadingSection}
+                            >
+                                {isLoadingSection ? (
+                                    <div className="loading-spinner small" />
+                                ) : isExpanded ? (
+                                    <ChevronDownIcon className="w-4 h-4" />
+                                ) : (
+                                    <ChevronRightIcon className="w-4 h-4" />
+                                )}
+                            </button>
+                        )}
+                        <h3 className={`section-title level-${level} ${level === 0 ? 'expandable' : ''}`}>
+                            {section.title}
+                        </h3>
+                    </div>
                     {isAdmin && (
-                        <div className="section-actions">
+                        <div className="section-actions" onClick={(e) => e.stopPropagation()}>
                             <button 
                                 className="btn btn-sm btn-outline"
                                 onClick={() => handleCreateChart(section.id)}
@@ -226,41 +351,169 @@ const ChartsPage = () => {
                     <p className="section-description">{section.description}</p>
                 )}
 
-                {/* Charts in this section */}
-                {sectionCharts.length > 0 && (
-                    <div className="charts-container">
-                        {sectionCharts.map(chart => (
-                            <div key={`chart-${chart.chartId || chart.id}`} className="chart-item">
-                                <div className="chart-header">
-                                    <h4 className="chart-title">{chart.title || chart.chartName}</h4>
-                                    {isAdmin && (
-                                        <div className="chart-actions">
-                                            <button 
-                                                className="btn btn-xs btn-primary"
-                                                onClick={() => handleEditChart(chart)}
-                                            >
-                                                Düzenle
-                                            </button>
-                                            <button 
-                                                className="btn btn-xs btn-danger"
-                                                onClick={() => handleDeleteChart(chart.chartId || chart.id)}
-                                            >
-                                                Sil
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                                <ChartDisplay chart={chart} />
+                {/* Expanded content */}
+                {isExpanded && (
+                    <div className="section-content">
+                        {/* Sub sections */}
+                        {hasSubSections && section.subSections.length > 0 && (
+                            <div className="sub-sections">
+                                {section.subSections.map(subSection => 
+                                    renderSubSection(subSection, section.id, level + 1)
+                                )}
                             </div>
-                        ))}
+                        )}
+
+                        {/* Charts in this section (show only if expanded) */}
+                        {sectionCharts.length > 0 && (
+                            <div className="charts-container">
+                                {sectionCharts.map(chart => (
+                                    <div key={`chart-${chart.chartId || chart.id}`} className="chart-item">
+                                        <div className="chart-header">
+                                            <h4 className="chart-title">{chart.title || chart.chartName}</h4>
+                                            {isAdmin && (
+                                                <div className="chart-actions">
+                                                    <button 
+                                                        className="btn btn-xs btn-primary"
+                                                        onClick={() => handleEditChart(chart)}
+                                                    >
+                                                        Düzenle
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-xs btn-danger"
+                                                        onClick={() => handleDeleteChart(chart.chartId || chart.id)}
+                                                    >
+                                                        Sil
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <ChartDisplay chart={chart} />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Show message if expanded but no content */}
+                        {isExpanded && !hasSubSections && sectionCharts.length === 0 && (
+                            <div className="empty-content">
+                                <p>Bu bölümde henüz içerik bulunmuyor.</p>
+                                {isAdmin && (
+                                    <button 
+                                        className="btn btn-sm btn-primary"
+                                        onClick={() => handleCreateChart(section.id)}
+                                    >
+                                        İlk Grafiği Ekle
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
+            </div>
+        );
+    };
 
-                {/* Sub sections */}
-                {hasSubSections && (
-                    <div className="sub-sections">
-                        {section.subSections.map(subSection => 
-                            renderSection(subSection, level + 1)
+    const renderSubSection = (subSection, parentSectionId, level = 1) => {
+        const subSectionCharts = charts[subSection.id] || [];
+        const isExpanded = subSection.isExpanded;
+        const isLoadingCharts = loadingCharts.has(subSection.id);
+
+        return (
+            <div key={`subsection-${subSection.id}`} className={`chart-section level-${level}`}>
+                <div className="section-header" onClick={() => toggleSubSection(parentSectionId, subSection.id)}>
+                    <div className="section-title-container">
+                        <button 
+                            className="expand-button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleSubSection(parentSectionId, subSection.id);
+                            }}
+                            disabled={isLoadingCharts}
+                        >
+                            {isLoadingCharts ? (
+                                <div className="loading-spinner small" />
+                            ) : isExpanded ? (
+                                <ChevronDownIcon className="w-4 h-4" />
+                            ) : (
+                                <ChevronRightIcon className="w-4 h-4" />
+                            )}
+                        </button>
+                        <h4 className={`section-title level-${level} expandable`}>
+                            {subSection.title}
+                        </h4>
+                        {subSection.chartCount > 0 && (
+                            <span className="chart-count">({subSection.chartCount} grafik)</span>
+                        )}
+                    </div>
+                    {isAdmin && (
+                        <div className="section-actions" onClick={(e) => e.stopPropagation()}>
+                            <button 
+                                className="btn btn-sm btn-outline"
+                                onClick={() => handleCreateChart(subSection.id)}
+                                title="Grafik Ekle"
+                            >
+                                <PlusIcon className="w-4 h-4" />
+                            </button>
+                            <button 
+                                className="btn btn-sm btn-outline"
+                                onClick={() => {
+                                    setEditingSection(subSection);
+                                    setShowSectionManager(true);
+                                }}
+                                title="Başlık Düzenle"
+                            >
+                                <SettingsIcon className="w-4 h-4" />
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {subSection.description && (
+                    <p className="section-description">{subSection.description}</p>
+                )}
+
+                {/* Charts in subsection (show only if expanded) */}
+                {isExpanded && (
+                    <div className="section-content">
+                        {subSectionCharts.length > 0 ? (
+                            <div className="charts-container">
+                                {subSectionCharts.map(chart => (
+                                    <div key={`chart-${chart.chartId || chart.id}`} className="chart-item">
+                                        <div className="chart-header">
+                                            <h5 className="chart-title">{chart.title || chart.chartName}</h5>
+                                            {isAdmin && (
+                                                <div className="chart-actions">
+                                                    <button 
+                                                        className="btn btn-xs btn-primary"
+                                                        onClick={() => handleEditChart(chart)}
+                                                    >
+                                                        Düzenle
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-xs btn-danger"
+                                                        onClick={() => handleDeleteChart(chart.chartId || chart.id)}
+                                                    >
+                                                        Sil
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <ChartDisplay chart={chart} />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="empty-content">
+                                <p>Bu alt bölümde henüz grafik bulunmuyor.</p>
+                                {isAdmin && (
+                                    <button 
+                                        className="btn btn-sm btn-primary"
+                                        onClick={() => handleCreateChart(subSection.id)}
+                                    >
+                                        İlk Grafiği Ekle
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </div>
                 )}
@@ -332,7 +585,7 @@ const ChartsPage = () => {
                         setEditingSection(null);
                     }}
                     onSuccess={handleSectionUpdate}
-                    sections={sections}
+                    onDelete={handleSectionDelete}
                     editingSection={editingSection}
                 />
             )}

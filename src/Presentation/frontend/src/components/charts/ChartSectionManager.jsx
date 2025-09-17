@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import chartService from '../../services/api/chartService';
 import { CloseIcon, PlusIcon, TrashIcon, EditIcon } from '../common/Icons';
 
-const ChartSectionManager = ({ isOpen, onClose, onSuccess, sections, editingSection }) => {
+const ChartSectionManager = ({ isOpen, onClose, onSuccess, onDelete, editingSection }) => {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -14,6 +14,9 @@ const ChartSectionManager = ({ isOpen, onClose, onSuccess, sections, editingSect
     const [error, setError] = useState('');
     const [editMode, setEditMode] = useState(false);
     const [editingSectionId, setEditingSectionId] = useState(null);
+    const [expandedSections, setExpandedSections] = useState(new Set());
+    const [loadingSections, setLoadingSections] = useState(new Set());
+    const [loadedSections, setLoadedSections] = useState(new Set());
 
     const buildTree = useCallback((items, parentId = null) => {
         return items
@@ -39,25 +42,38 @@ const ChartSectionManager = ({ isOpen, onClose, onSuccess, sections, editingSect
 
     useEffect(() => {
         if (isOpen) {
-            // Map backend sections to frontend format
-            const mappedSections = (sections || []).map(section => ({
-                id: section.id || section.sectionId,
-                title: section.title || section.sectionName || section.description || 'İsimsiz Başlık',
-                description: section.description,
-                parentSectionId: section.parentSectionId,
-                orderIndex: section.orderIndex || section.displayOrder || 0,
-                children: section.subSections?.map(child => ({
-                    id: child.id || child.sectionId,
-                    title: child.title || child.sectionName || child.description || 'İsimsiz Başlık',
-                    description: child.description,
-                    parentSectionId: child.parentSectionId || section.id || section.sectionId,
-                    orderIndex: child.orderIndex || child.displayOrder || 0,
-                    children: []
-                })) || []
-            }));
+            // Load sections data same way as ChartsPage to know which sections have children
+            const loadInitialData = async () => {
+                try {
+                    const sectionsResponse = await chartService.getChartSections();
+                    const sectionsData = sectionsResponse.data || [];
+                    
+                    // Map only root sections, but include info about whether they have children
+                    const rootSections = sectionsData.map(section => ({
+                        id: section.sectionId,
+                        title: section.sectionName || section.description || 'İsimsiz Başlık',
+                        description: section.description,
+                        parentSectionId: null,
+                        orderIndex: section.displayOrder || 0,
+                        hasSubSections: section.children && section.children.length > 0,
+                        children: [] // Will be loaded when expanded
+                    }))
+                    .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+                    
+                    setSectionsTree(rootSections);
+                } catch (err) {
+                    console.error('Error loading sections:', err);
+                    // If API fails, just set empty array
+                    setSectionsTree([]);
+                }
+            };
             
-            const tree = buildTree(mappedSections);
-            setSectionsTree(tree);
+            loadInitialData();
+            
+            // Reset expansion state
+            setExpandedSections(new Set());
+            setLoadedSections(new Set());
+            
             if (editingSection) {
                 setEditMode(true);
                 setEditingSectionId(editingSection.id);
@@ -71,7 +87,7 @@ const ChartSectionManager = ({ isOpen, onClose, onSuccess, sections, editingSect
                 resetForm();
             }
         }
-    }, [isOpen, editingSection, sections, buildTree, resetForm]);
+    }, [isOpen, editingSection, resetForm]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -140,7 +156,17 @@ const ChartSectionManager = ({ isOpen, onClose, onSuccess, sections, editingSect
         try {
             setLoading(true);
             await chartService.deleteChartSection(sectionId);
-            onSuccess();
+            
+            // Use onDelete if provided, otherwise fallback to onSuccess
+            if (onDelete) {
+                onDelete();
+            } else {
+                onSuccess();
+            }
+            
+            // Reset any editing state
+            resetForm();
+            
         } catch (err) {
             console.error('Error deleting section:', err);
             setError('Başlık silinirken bir hata oluştu.');
@@ -149,12 +175,128 @@ const ChartSectionManager = ({ isOpen, onClose, onSuccess, sections, editingSect
         }
     };
 
-    const renderSectionItem = (section, level = 0) => (
-        <div key={section.id} className={`section-item level-${level}`}>
-            <div className="section-info">
-                <div className="section-title-line">
-                    <span className="section-title">{section.title}</span>
-                    <div className="section-actions">
+    const toggleSectionExpansion = async (sectionId) => {
+        const isCurrentlyExpanded = expandedSections.has(sectionId);
+        
+        setExpandedSections(prev => {
+            const newSet = new Set(prev);
+            if (isCurrentlyExpanded) {
+                newSet.delete(sectionId);
+            } else {
+                newSet.add(sectionId);
+            }
+            return newSet;
+        });
+        
+        // If expanding and haven't loaded subsections yet, load them
+        if (!isCurrentlyExpanded && !loadedSections.has(sectionId)) {
+            await loadSectionData(sectionId);
+        }
+    };
+
+    const loadSectionData = async (sectionId) => {
+        try {
+            setLoadingSections(prev => new Set([...prev, sectionId]));
+            
+            // Load full hierarchy from API (same as main ChartsPage)
+            const response = await chartService.getChartSections();
+            const allSections = response.data || [];
+            
+            // Find the section we're expanding and get its children
+            const findSectionWithChildren = (sections, targetId) => {
+                for (const section of sections) {
+                    if (section.sectionId === targetId) {
+                        return section;
+                    }
+                    if (section.children) {
+                        const found = findSectionWithChildren(section.children, targetId);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            };
+            
+            const sectionData = findSectionWithChildren(allSections, sectionId);
+            
+            if (sectionData && sectionData.children) {
+                // Update the tree with the loaded subsections
+                setSectionsTree(prevTree => {
+                    const updateSectionChildren = (sections) => {
+                        return sections.map(section => {
+                            if (section.id === sectionId) {
+                                return {
+                                    ...section,
+                                    children: sectionData.children.map(child => ({
+                                        id: child.sectionId,
+                                        title: child.sectionName || child.description || 'İsimsiz Başlık',
+                                        description: child.description,
+                                        parentSectionId: sectionId,
+                                        orderIndex: child.displayOrder || 0,
+                                        hasSubSections: child.children && child.children.length > 0,
+                                        children: [] // Will be loaded when expanded
+                                    }))
+                                };
+                            } else if (section.children) {
+                                return {
+                                    ...section,
+                                    children: updateSectionChildren(section.children)
+                                };
+                            }
+                            return section;
+                        });
+                    };
+                    
+                    return updateSectionChildren(prevTree);
+                });
+                
+                setLoadedSections(prev => new Set([...prev, sectionId]));
+            }
+        } catch (err) {
+            console.error('Error loading section data:', err);
+            setError('Alt başlıklar yüklenirken hata oluştu.');
+        } finally {
+            setLoadingSections(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(sectionId);
+                return newSet;
+            });
+        }
+    };
+
+    const renderSectionItem = (section, level = 0) => {
+        const hasChildren = section.children && section.children.length > 0;
+        const isExpanded = expandedSections.has(section.id);
+        const isLoading = loadingSections.has(section.id);
+        const hasBeenLoaded = loadedSections.has(section.id);
+        
+        // Show expand button if section has loaded children OR if it has subsections that haven't been loaded yet
+        const showExpandButton = hasChildren || (section.hasSubSections && !hasBeenLoaded);
+        
+        return (
+            <div key={section.id} className={`hierarchy-item level-${level}`}>
+                <div className="hierarchy-content">
+                    <div className="hierarchy-title">
+                        <span className="hierarchy-indent" style={{ paddingLeft: `${level * 1.5}rem` }}>
+                            {level > 0 && <span className="hierarchy-connector">└ </span>}
+                            {showExpandButton && (
+                                <button 
+                                    className="expand-toggle"
+                                    onClick={() => toggleSectionExpansion(section.id)}
+                                    type="button"
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? '⟳' : (isExpanded ? '▼' : '▶')}
+                                </button>
+                            )}
+                            <span 
+                                className={`section-name ${showExpandButton ? 'expandable' : ''}`}
+                                onClick={() => showExpandButton && toggleSectionExpansion(section.id)}
+                            >
+                                {section.title}
+                            </span>
+                        </span>
+                    </div>
+                    <div className="hierarchy-actions">
                         <button
                             type="button"
                             className="btn btn-xs btn-outline"
@@ -173,17 +315,17 @@ const ChartSectionManager = ({ isOpen, onClose, onSuccess, sections, editingSect
                         </button>
                     </div>
                 </div>
-                {section.description && (
-                    <p className="section-desc">{section.description}</p>
+                {/* Show children when expanded */}
+                {hasChildren && isExpanded && (
+                    <div className="hierarchy-children">
+                        {section.children.map(child => 
+                            renderSectionItem(child, level + 1)
+                        )}
+                    </div>
                 )}
             </div>
-            {section.children && section.children.length > 0 && (
-                <div className="sub-sections">
-                    {section.children.map(child => renderSectionItem(child, level + 1))}
-                </div>
-            )}
-        </div>
-    );
+        );
+    };
 
     const getFlatSections = (sections, level = 0) => {
         let result = [];
@@ -200,7 +342,7 @@ const ChartSectionManager = ({ isOpen, onClose, onSuccess, sections, editingSect
 
     return (
         <div className="modal-overlay">
-            <div className="modal-container large">
+            <div className="modal-container extra-large">
                 <div className="modal-header">
                     <h2>{editMode ? 'Başlık Düzenle' : 'Başlık Yönetimi'}</h2>
                     <button className="modal-close" onClick={onClose}>
@@ -259,10 +401,13 @@ const ChartSectionManager = ({ isOpen, onClose, onSuccess, sections, editingSect
                                             .filter(s => s.id !== editingSectionId)
                                             .map(section => (
                                                 <option key={section.id} value={section.id}>
-                                                    {'  '.repeat(section.level)}└ {section.title}
+                                                    {'──'.repeat(section.level)}{section.level > 0 ? '└ ' : ''}{section.title}
                                                 </option>
                                             ))}
                                     </select>
+                                    <small className="form-help">
+                                        Herhangi bir başlığın altına yeni başlık ekleyebilirsiniz. Derin hiyerarşi desteklenir.
+                                    </small>
                                 </div>
 
                                 <div className="form-group">
@@ -281,7 +426,10 @@ const ChartSectionManager = ({ isOpen, onClose, onSuccess, sections, editingSect
                                     <button
                                         type="button"
                                         className="btn btn-outline"
-                                        onClick={resetForm}
+                                        onClick={() => {
+                                            resetForm();
+                                            onClose();
+                                        }}
                                         disabled={loading}
                                     >
                                         İptal
@@ -299,12 +447,14 @@ const ChartSectionManager = ({ isOpen, onClose, onSuccess, sections, editingSect
 
                         {/* Sections Tree */}
                         <div className="tree-section">
-                            <h3>Mevcut Başlıklar</h3>
+                            <h3>Başlık Hiyerarşisi</h3>
                             <div className="sections-tree">
                                 {sectionsTree.length === 0 ? (
                                     <p className="empty-message">Henüz başlık oluşturulmamış.</p>
                                 ) : (
-                                    sectionsTree.map(section => renderSectionItem(section))
+                                    <div className="hierarchical-list">
+                                        {sectionsTree.map(section => renderSectionItem(section))}
+                                    </div>
                                 )}
                             </div>
                         </div>
