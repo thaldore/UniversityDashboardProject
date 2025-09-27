@@ -58,6 +58,33 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
       ]);
       setDepartments(deptResponse.data);
       setUsers(userResponse.data);
+      
+      // Düzenleme modunda period detaylarını getir
+      if (isEdit && period) {
+        try {
+          const periodDetail = await performanceService.getPerformancePeriodById(period.periodId);
+          const periodData = periodDetail.data;
+          
+          setFormData({
+            periodName: periodData.periodName || '',
+            periodStartDate: periodData.periodStartDate ? new Date(periodData.periodStartDate).toISOString().split('T')[0] : '',
+            periodEndDate: periodData.periodEndDate ? new Date(periodData.periodEndDate).toISOString().split('T')[0] : '',
+            targetEntryStartDate: periodData.targetEntryStartDate ? new Date(periodData.targetEntryStartDate).toISOString().split('T')[0] : '',
+            targetEntryEndDate: periodData.targetEntryEndDate ? new Date(periodData.targetEntryEndDate).toISOString().split('T')[0] : '',
+            targetReviseStartDate: periodData.targetReviseStartDate ? new Date(periodData.targetReviseStartDate).toISOString().split('T')[0] : '',
+            targetReviseEndDate: periodData.targetReviseEndDate ? new Date(periodData.targetReviseEndDate).toISOString().split('T')[0] : '',
+            resultEntryStartDate: periodData.resultEntryStartDate ? new Date(periodData.resultEntryStartDate).toISOString().split('T')[0] : '',
+            resultEntryEndDate: periodData.resultEntryEndDate ? new Date(periodData.resultEntryEndDate).toISOString().split('T')[0] : '',
+            isActive: periodData.isActive ?? true,
+            sendNotification: periodData.sendNotification ?? true,
+            sendEmail: periodData.sendEmail ?? true,
+            scorings: periodData.scorings || [],
+            assignments: periodData.assignments || []
+          });
+        } catch (error) {
+          console.error('Period detayları yüklenirken hata:', error);
+        }
+      }
     } catch (error) {
       console.error('Veri yüklenirken hata:', error);
     }
@@ -118,6 +145,99 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
       ...prev,
       assignments: prev.assignments.map((assignment, i) => 
         i === index ? { ...assignment, [field]: value } : assignment
+      )
+    }));
+  };
+
+  // Yeni atama fonksiyonları
+  const handleDepartmentAssignment = (departmentId, isAssigned) => {
+    if (isAssigned) {
+      // Departman ataması ekle
+      setFormData(prev => ({
+        ...prev,
+        assignments: [...prev.assignments, {
+          assignmentType: 1,
+          departmentId: departmentId,
+          userId: null,
+          targetEntryUserId: null
+        }]
+      }));
+    } else {
+      // Departman atamasını kaldır
+      setFormData(prev => ({
+        ...prev,
+        assignments: prev.assignments.filter(a => !(a.assignmentType === 1 && a.departmentId === departmentId))
+      }));
+    }
+  };
+
+  const handleUserAssignment = (userId, isAssigned) => {
+    if (isAssigned) {
+      // Kullanıcı ataması ekle
+      setFormData(prev => ({
+        ...prev,
+        assignments: [...prev.assignments, {
+          assignmentType: 2,
+          departmentId: null,
+          userId: userId,
+          targetEntryUserId: null
+        }]
+      }));
+    } else {
+      // Kullanıcı atamasını kaldır
+      setFormData(prev => ({
+        ...prev,
+        assignments: prev.assignments.filter(a => !(a.assignmentType === 2 && a.userId === userId))
+      }));
+    }
+  };
+
+  const getAssignmentTargetEntryUserId = (id) => {
+    const assignment = formData.assignments.find(a => 
+      (a.assignmentType === 1 && a.departmentId === id) || 
+      (a.assignmentType === 2 && a.userId === id)
+    );
+    return assignment?.targetEntryUserId || null;
+  };
+
+  const updateDepartmentTargetEntryUser = (departmentId, userId) => {
+    setFormData(prev => ({
+      ...prev,
+      assignments: prev.assignments.map(a => 
+        a.assignmentType === 1 && a.departmentId === departmentId 
+          ? { ...a, targetEntryUserId: userId }
+          : a
+      )
+    }));
+  };
+
+  const updateUserTargetEntryUser = (userId, targetEntryUserId) => {
+    setFormData(prev => ({
+      ...prev,
+      assignments: prev.assignments.map(a => 
+        a.assignmentType === 2 && a.userId === userId 
+          ? { ...a, targetEntryUserId: targetEntryUserId }
+          : a
+      )
+    }));
+  };
+
+  // Yeni rol yönetimi fonksiyonları
+  const getAssignmentRole = (id) => {
+    const assignment = formData.assignments.find(a => 
+      (a.assignmentType === 1 && a.departmentId === id) || 
+      (a.assignmentType === 2 && a.userId === id)
+    );
+    return assignment?.role || null;
+  };
+
+  const updateDepartmentRole = (departmentId, role) => {
+    setFormData(prev => ({
+      ...prev,
+      assignments: prev.assignments.map(a => 
+        a.assignmentType === 1 && a.departmentId === departmentId 
+          ? { ...a, role: role }
+          : a
       )
     }));
   };
@@ -468,80 +588,83 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
             {/* Atamalar */}
             <div className="form-section">
               <h3>Atamalar</h3>
-              <div className="assignment-section">
-                {formData.assignments.map((assignment, index) => (
-                  <div key={index} className="assignment-item">
-                    <div className="form-grid">
-                      <div className="form-group">
-                        <label className="form-label">Atama Tipi</label>
-                        <select
-                          value={assignment.assignmentType}
-                          onChange={(e) => updateAssignment(index, 'assignmentType', parseInt(e.target.value))}
-                          className="form-input"
-                        >
-                          <option value={1}>Departman</option>
-                          <option value={2}>Kullanıcı</option>
-                        </select>
-                      </div>
-
-                      {assignment.assignmentType === 1 && (
-                        <div className="form-group">
-                          <label className="form-label">Departman</label>
-                          <select
-                            value={assignment.departmentId || ''}
-                            onChange={(e) => updateAssignment(index, 'departmentId', e.target.value ? parseInt(e.target.value) : null)}
-                            className="form-input"
-                          >
-                            <option value="">Departman Seçin</option>
-                            {departments.map(dept => (
-                              <option key={dept.departmentId} value={dept.departmentId}>
-                                {dept.departmentName}
-                              </option>
-                            ))}
-                          </select>
+              
+              {/* Departman Atamaları */}
+              <div className="assignment-type-section">
+                <h4>Departman Atamaları</h4>
+                <div className="department-assignments">
+                  {departments.map(dept => {
+                    const isAssigned = formData.assignments.some(a => a.assignmentType === 1 && a.departmentId === dept.departmentId);
+                    return (
+                      <div key={dept.departmentId} className="assignment-card">
+                        <div className="assignment-header">
+                          <label className="assignment-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={isAssigned}
+                              onChange={(e) => handleDepartmentAssignment(dept.departmentId, e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            {dept.departmentName}
+                          </label>
                         </div>
-                      )}
-
-                      {assignment.assignmentType === 2 && (
-                        <div className="form-group">
-                          <label className="form-label">Kullanıcı</label>
-                          <select
-                            value={assignment.userId || ''}
-                            onChange={(e) => updateAssignment(index, 'userId', e.target.value ? parseInt(e.target.value) : null)}
-                            className="form-input"
-                          >
-                            <option value="">Kullanıcı Seçin</option>
-                            {users.map(user => (
-                              <option key={user.id} value={user.id}>
-                                {user.firstName} {user.lastName}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      <div className="form-group">
-                        <button
-                          type="button"
-                          onClick={() => removeAssignment(index)}
-                          className="btn btn-danger btn-sm"
-                        >
-                          <X size={16} />
-                          Sil
-                        </button>
+                        
+                        {isAssigned && (
+                          <div className="assignment-details">
+                            <div className="form-group">
+                              <label className="form-label">Hedef Girişi ve Sonuç Girişi Yapacak Rol</label>
+                              <select
+                                value={getAssignmentRole(dept.departmentId) || ''}
+                                onChange={(e) => updateDepartmentRole(dept.departmentId, e.target.value)}
+                                className="form-input"
+                              >
+                                <option value="">Rol Seçin</option>
+                                <option value="manager">Yönetici (Manager)</option>
+                                <option value="user">Kullanıcı (User)</option>
+                                <option value="all">Tüm Roller</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
+              </div>
 
-                <button
-                  type="button"
-                  onClick={addAssignment}
-                  className="btn btn-secondary"
-                >
-                  <Users size={16} />
-                  Atama Ekle
-                </button>
+              {/* Kullanıcı Atamaları */}
+              <div className="assignment-type-section">
+                <h4>Kullanıcı Atamaları</h4>
+                <div className="user-assignments">
+                  {users.map(user => {
+                    const isAssigned = formData.assignments.some(a => a.assignmentType === 2 && a.userId === user.userId);
+                    return (
+                      <div key={user.userId} className="assignment-card">
+                        <div className="assignment-header">
+                          <label className="assignment-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={isAssigned}
+                              onChange={(e) => handleUserAssignment(user.userId, e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            {user.firstName} {user.lastName}
+                          </label>
+                        </div>
+                        
+                        {isAssigned && (
+                          <div className="assignment-details">
+                            <div className="assignment-info">
+                              <p className="info-text">
+                                <strong>Hedef Girişi ve Sonuç Girişi Yapacak Kişi:</strong> {user.firstName} {user.lastName} (Kendisi)
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 

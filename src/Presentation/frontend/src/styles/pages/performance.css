@@ -79,10 +79,16 @@
   margin: 0 0 0.5rem 0;
 }
 
-.period-actions {
-  display: flex;
-  gap: 0.5rem;
-}
+ .period-actions {
+   display: flex;
+   gap: 0.25rem;
+ }
+ 
+ .period-actions .btn {
+   padding: 0.25rem 0.5rem;
+   font-size: 0.75rem;
+   min-width: auto;
+ }
 
  .period-content {
    padding: 1.5rem;
@@ -1076,5 +1082,152 @@
   .period-actions,
   .target-actions {
     justify-content: center;
+  }
+}
+
+/* Yeni Atama Tasarımı */
+.assignment-type-section {
+  margin-bottom: 2rem;
+}
+
+.assignment-type-section h4 {
+  color: var(--gray-700);
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--primary-100);
+}
+
+.department-assignments,
+.user-assignments {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.assignment-card {
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 1rem;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.assignment-card:hover {
+  border-color: var(--primary-300);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.assignment-header {
+  margin-bottom: 0.5rem;
+}
+
+.assignment-checkbox {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.assignment-checkbox input[type="checkbox"] {
+  margin-right: 0.5rem;
+  width: 16px;
+  height: 16px;
+}
+
+.assignment-details {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gray-100);
+}
+
+.assignment-details .form-group {
+  margin-bottom: 0.75rem;
+}
+
+.assignment-details .form-group:last-child {
+  margin-bottom: 0;
+}
+
+/* Hedeflerim Sayfası Bölümleri */
+.targets-section {
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--gray-700);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--primary-100);
+}
+
+/* Performans Dönemi Filtresi */
+.period-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.filter-label {
+  font-weight: 500;
+  color: var(--gray-700);
+  white-space: nowrap;
+}
+
+.filter-select {
+  padding: 0.5rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: white;
+  color: var(--gray-700);
+  font-size: 0.9rem;
+  min-width: 200px;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+/* Atama Bilgi Metni */
+.assignment-info {
+  background: var(--info-50);
+  border: 1px solid var(--info-200);
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+
+.info-text {
+  margin: 0;
+  color: var(--info-700);
+  font-size: 0.9rem;
+}
+
+.info-text strong {
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .department-assignments,
+  .user-assignments {
+    grid-template-columns: 1fr;
+  }
+  
+  .period-filter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .filter-select {
+    min-width: auto;
   }
 }

@@ -15,6 +15,9 @@ import {
 
 const MyTargetsPage = () => {
   const [targets, setTargets] = useState([]);
+  const [userTargets, setUserTargets] = useState([]);
+  const [departmentTargets, setDepartmentTargets] = useState([]);
+  const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showTargetModal, setShowTargetModal] = useState(false);
@@ -23,10 +26,18 @@ const MyTargetsPage = () => {
   const [editingTarget, setEditingTarget] = useState(null);
   const [selectedTarget, setSelectedTarget] = useState(null);
   const [filter, setFilter] = useState('all'); // all, completed, pending
+  const [periodFilter, setPeriodFilter] = useState('all'); // all, periodId
 
   useEffect(() => {
-    loadTargets();
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    await Promise.all([
+      loadTargets(),
+      loadPeriods()
+    ]);
+  };
 
   const loadTargets = async () => {
     setLoading(true);
@@ -34,12 +45,31 @@ const MyTargetsPage = () => {
     
     try {
       const response = await performanceService.getPerformanceTargets({ userId: null }); // Current user's targets
-      setTargets(response.data);
+      const allTargets = response.data;
+      
+      // Kullanıcı hedefleri (kendisine atanan)
+      const userTargets = allTargets.filter(target => target.assignedToUserId && target.assignedToUserId !== null);
+      
+      // Departman hedefleri (departmanına atanan)
+      const departmentTargets = allTargets.filter(target => target.assignedToDepartmentId && target.assignedToDepartmentId !== null);
+      
+      setTargets(allTargets);
+      setUserTargets(userTargets);
+      setDepartmentTargets(departmentTargets);
     } catch (err) {
       console.error('Hedefler yüklenirken hata:', err);
       setError('Hedefler yüklenirken bir hata oluştu.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPeriods = async () => {
+    try {
+      const response = await performanceService.getPerformancePeriods();
+      setPeriods(response.data);
+    } catch (err) {
+      console.error('Performans dönemleri yüklenirken hata:', err);
     }
   };
 
@@ -85,14 +115,25 @@ const MyTargetsPage = () => {
     }
   };
 
-  const filteredTargets = targets.filter(target => {
-    if (filter === 'completed') {
-      return target.status === 7; // ProgressApproved
-    } else if (filter === 'pending') {
-      return target.status !== 7; // Not completed
-    }
-    return true;
-  });
+  const getFilteredTargets = (targetList) => {
+    return targetList.filter(target => {
+      // Durum filtresi
+      let statusMatch = true;
+      if (filter === 'completed') {
+        statusMatch = target.status === 7; // ProgressApproved
+      } else if (filter === 'pending') {
+        statusMatch = target.status !== 7; // Not completed
+      }
+
+      // Performans dönemi filtresi
+      let periodMatch = true;
+      if (periodFilter !== 'all') {
+        periodMatch = target.periodId === parseInt(periodFilter);
+      }
+
+      return statusMatch && periodMatch;
+    });
+  };
 
   if (loading) {
     return (
@@ -152,12 +193,34 @@ const MyTargetsPage = () => {
             Tamamlanan Hedefler
           </button>
         </div>
+        
+        <div className="period-filter">
+          <label className="filter-label">Performans Dönemi:</label>
+          <select
+            value={periodFilter}
+            onChange={(e) => setPeriodFilter(e.target.value)}
+            className="filter-select"
+          >
+            <option value="all">Tüm Performans Dönemleri</option>
+            {periods.map(period => (
+              <option key={period.periodId} value={period.periodId}>
+                {period.periodName}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="targets-container">
-        {filteredTargets.length > 0 ? (
-          <div className="targets-grid">
-            {filteredTargets.map((target) => (
+        {/* Kullanıcı Hedefleri */}
+        {userTargets.length > 0 && (
+          <div className="targets-section">
+            <h2 className="section-title">
+              <Target size={20} />
+              Kişisel Hedeflerim
+            </h2>
+            <div className="targets-grid">
+              {getFilteredTargets(userTargets).map((target) => (
               <div key={target.targetId} className="target-card">
                 <div className="target-header">
                   <div className="target-title">
@@ -271,21 +334,151 @@ const MyTargetsPage = () => {
                 </div>
               </div>
             ))}
+            </div>
           </div>
-        ) : (
+        )}
+
+        {/* Departman Hedefleri */}
+        {departmentTargets.length > 0 && (
+          <div className="targets-section">
+            <h2 className="section-title">
+              <Target size={20} />
+              Departman Hedefleri
+            </h2>
+            <div className="targets-grid">
+              {getFilteredTargets(departmentTargets).map((target) => (
+                <div key={target.targetId} className="target-card">
+                  <div className="target-header">
+                    <div className="target-title">
+                      <h3>{target.targetName}</h3>
+                      <span className={`status-badge ${getTargetStatusBadgeClass(target.status)}`}>
+                        {getTargetStatusText(target.status)}
+                      </span>
+                    </div>
+                    <div className="target-actions">
+                      {target.status === 1 && ( // Draft
+                        <button
+                          onClick={() => handleSubmitTarget(target.targetId)}
+                          className="btn btn-primary btn-sm"
+                        >
+                          <Send size={16} />
+                          Onaya Gönder
+                        </button>
+                      )}
+                      {target.status === 3 && ( // Approved
+                        <button
+                          onClick={() => handleAddProgress(target)}
+                          className="btn btn-primary btn-sm"
+                        >
+                          <TrendingUp size={16} />
+                          İlerleme Ekle
+                        </button>
+                      )}
+                      {target.status === 7 && ( // ProgressApproved
+                        <button
+                          onClick={() => handleViewContributions(target.targetId)}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          <BarChart3 size={16} />
+                          Katkı Tablosu
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="target-content">
+                    <div className="target-info">
+                      <div className="info-row">
+                        <span className="info-label">Hedef Değeri:</span>
+                        <span className="info-value">{target.targetValue} {target.unit}</span>
+                      </div>
+                      <div className="info-row">
+                        <span className="info-label">Gerçekleşme:</span>
+                        <span className="info-value">{target.actualValue || 0} {target.unit}</span>
+                      </div>
+                      <div className="info-row">
+                        <span className="info-label">Tamamlanma Oranı:</span>
+                        <span className="info-value">{formatCompletionRate(target.completionRate)}</span>
+                      </div>
+                      <div className="info-row">
+                        <span className="info-label">Ağırlık:</span>
+                        <span className="info-value">{target.weight}%</span>
+                      </div>
+                      <div className="info-row">
+                        <span className="info-label">Yön:</span>
+                        <span className={`direction-badge ${getTargetDirectionBadgeClass(target.direction)}`}>
+                          {getTargetDirectionText(target.direction)}
+                        </span>
+                      </div>
+                      {target.score && (
+                        <div className="info-row">
+                          <span className="info-label">Puan:</span>
+                          <span className="info-value">{formatScore(target.score)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {target.description && (
+                      <div className="target-description">
+                        <p>{target.description}</p>
+                      </div>
+                    )}
+
+                    {target.status === 3 && ( // Approved
+                      <div className="progress-section">
+                        <div className="progress-header">
+                          <h4>İlerleme Bilgileri</h4>
+                        </div>
+                        <div className="progress-content">
+                          <div className="progress-stats">
+                            <div className="progress-stat">
+                              <span className="stat-label">Mevcut Değer:</span>
+                              <span className="stat-value">{target.actualValue || 0} {target.unit}</span>
+                            </div>
+                            <div className="progress-stat">
+                              <span className="stat-label">Tamamlanma:</span>
+                              <span className="stat-value">{formatCompletionRate(target.completionRate)}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleAddProgress(target)}
+                            className="btn btn-primary"
+                          >
+                            <TrendingUp size={16} />
+                            İlerleme Ekle
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="target-footer">
+                    <div className="target-meta">
+                      <span>Oluşturulma: {new Date(target.createdAt).toLocaleDateString('tr-TR')}</span>
+                      {target.updatedAt && (
+                        <span>Güncellenme: {new Date(target.updatedAt).toLocaleDateString('tr-TR')}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Hedef Bulunamadı */}
+        {userTargets.length === 0 && departmentTargets.length === 0 && (
           <div className="empty-state">
             <Target size={48} />
             <h3>Hedef Bulunamadı</h3>
-            <p>Seçilen filtreye göre hedef bulunamadı.</p>
-            {filter === 'all' && (
-              <button
-                onClick={handleCreateTarget}
-                className="btn btn-primary"
-              >
-                <Plus size={20} />
-                İlk Hedefinizi Oluşturun
-              </button>
-            )}
+            <p>Size atanan herhangi bir hedef bulunmuyor.</p>
+            <button
+              onClick={handleCreateTarget}
+              className="btn btn-primary"
+            >
+              <Plus size={20} />
+              Yeni Hedef Oluştur
+            </button>
           </div>
         )}
       </div>

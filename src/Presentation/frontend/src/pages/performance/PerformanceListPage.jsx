@@ -164,14 +164,14 @@ const PerformanceListPage = () => {
                         <label>Hedef Giriş:</label>
                         <span>{formatDate(period.targetEntryStartDate)} - {formatDate(period.targetEntryEndDate)}</span>
                       </div>
-                      <div className="date-group">
-                        <label>Hedef Revize:</label>
-                        <span>{formatDate(period.targetReviseStartDate)} - {formatDate(period.targetReviseEndDate)}</span>
-                      </div>
-                      <div className="date-group">
-                        <label>Sonuç Giriş:</label>
-                        <span>{formatDate(period.resultEntryStartDate)} - {formatDate(period.resultEntryEndDate)}</span>
-                      </div>
+          <div className="date-group">
+            <label>Hedef Revize:</label>
+            <span>{period.targetReviseStartDate ? `${formatDate(period.targetReviseStartDate)} - ${formatDate(period.targetReviseEndDate)}` : '-'}</span>
+          </div>
+          <div className="date-group">
+            <label>Sonuç Giriş:</label>
+            <span>{period.resultEntryStartDate ? `${formatDate(period.resultEntryStartDate)} - ${formatDate(period.resultEntryEndDate)}` : '-'}</span>
+          </div>
                     </div>
 
                     <div className="period-stats">

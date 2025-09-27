@@ -15,6 +15,7 @@ import {
 
 const TargetManagementPage = () => {
   const [targets, setTargets] = useState([]);
+  const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showTargetModal, setShowTargetModal] = useState(false);
@@ -23,11 +24,19 @@ const TargetManagementPage = () => {
   const [editingTarget, setEditingTarget] = useState(null);
   const [selectedTarget, setSelectedTarget] = useState(null);
   const [filter, setFilter] = useState('all'); // all, pending, approved, completed
+  const [periodFilter, setPeriodFilter] = useState('all'); // all, periodId
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    loadTargets();
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    await Promise.all([
+      loadTargets(),
+      loadPeriods()
+    ]);
+  };
 
   const loadTargets = async () => {
     setLoading(true);
@@ -41,6 +50,15 @@ const TargetManagementPage = () => {
       setError('Hedefler yüklenirken bir hata oluştu.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPeriods = async () => {
+    try {
+      const response = await performanceService.getPerformancePeriods();
+      setPeriods(response.data);
+    } catch (err) {
+      console.error('Performans dönemleri yüklenirken hata:', err);
     }
   };
 
@@ -111,7 +129,9 @@ const TargetManagementPage = () => {
       target.targetName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       target.periodName.toLowerCase().includes(searchTerm.toLowerCase());
     
-    return matchesFilter && matchesSearch;
+    const matchesPeriod = periodFilter === 'all' || target.periodId === parseInt(periodFilter);
+    
+    return matchesFilter && matchesSearch && matchesPeriod;
   });
 
   if (loading) {
@@ -187,6 +207,22 @@ const TargetManagementPage = () => {
           >
             Tamamlanan Hedefler
           </button>
+        </div>
+        
+        <div className="period-filter">
+          <label className="filter-label">Performans Dönemi:</label>
+          <select
+            value={periodFilter}
+            onChange={(e) => setPeriodFilter(e.target.value)}
+            className="filter-select"
+          >
+            <option value="all">Tüm Performans Dönemleri</option>
+            {periods.map(period => (
+              <option key={period.periodId} value={period.periodId}>
+                {period.periodName}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

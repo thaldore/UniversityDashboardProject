@@ -33,8 +33,13 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     PeriodEndDate = p.PeriodEndDate,
                     TargetEntryStartDate = p.TargetEntryStartDate,
                     TargetEntryEndDate = p.TargetEntryEndDate,
+                    TargetReviseStartDate = p.TargetReviseStartDate,
+                    TargetReviseEndDate = p.TargetReviseEndDate,
+                    ResultEntryStartDate = p.ResultEntryStartDate,
+                    ResultEntryEndDate = p.ResultEntryEndDate,
                     IsActive = p.IsActive,
                     CreatedAt = p.CreatedAt,
+                    CreatedByUserName = $"{p.CreatedByUser.FirstName} {p.CreatedByUser.LastName}",
                     AssignmentCount = p.PeriodAssignments.Count,
                     TargetCount = p.Targets.Count
                 })

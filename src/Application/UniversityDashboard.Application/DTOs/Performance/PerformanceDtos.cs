@@ -31,8 +31,13 @@ namespace UniversityDashBoardProject.Application.DTOs.Performance
         public DateTime PeriodEndDate { get; set; }
         public DateTime TargetEntryStartDate { get; set; }
         public DateTime TargetEntryEndDate { get; set; }
+        public DateTime TargetReviseStartDate { get; set; }
+        public DateTime TargetReviseEndDate { get; set; }
+        public DateTime ResultEntryStartDate { get; set; }
+        public DateTime ResultEntryEndDate { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string CreatedByUserName { get; set; } = string.Empty;
         public int AssignmentCount { get; set; }
         public int TargetCount { get; set; }
     }

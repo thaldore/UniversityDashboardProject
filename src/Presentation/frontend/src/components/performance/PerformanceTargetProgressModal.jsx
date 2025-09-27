@@ -61,16 +61,25 @@ const PerformanceTargetProgressModal = ({ isOpen, onClose, onSuccess, progress =
     setErrors([]);
 
     try {
+      // FormData'yı hazırla
+      const submitData = {
+        ...formData,
+        targetId: targetId || formData.targetId
+      };
+
+      console.log('Gönderilen veri:', submitData);
+
       if (isEdit) {
-        await performanceService.updatePerformanceTargetProgress(progress.progressId, formData);
+        await performanceService.updatePerformanceTargetProgress(progress.progressId, submitData);
       } else {
-        await performanceService.createPerformanceTargetProgress(formData);
+        await performanceService.createPerformanceTargetProgress(submitData);
       }
 
       onSuccess();
       onClose();
     } catch (error) {
       console.error('Performans hedef ilerlemesi kaydedilirken hata:', error);
+      console.error('Hata detayı:', error.response?.data);
       setErrors([error.response?.data?.message || 'Bir hata oluştu.']);
     } finally {
       setLoading(false);
