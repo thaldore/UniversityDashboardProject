@@ -37,6 +37,24 @@ const Sidebar = () => {
       description: 'Gösterge verilerini gir'
     },
     { 
+      path: '/performance', 
+      label: 'Performans Dönemleri', 
+      icon: '📅',
+      description: 'Performans dönemlerini yönet'
+    },
+    { 
+      path: '/performance/my-targets', 
+      label: 'Hedeflerim', 
+      icon: '🎯',
+      description: 'Size atanan hedefler'
+    },
+    { 
+      path: '/performance/target-management', 
+      label: 'Hedef Yönetimi', 
+      icon: '⚙️',
+      description: 'Hedefleri yönet ve onayla'
+    },
+    { 
       path: '/auth/profile', 
       label: 'Profil', 
       icon: '👤',

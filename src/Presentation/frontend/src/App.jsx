@@ -11,6 +11,9 @@ import NewIndicatorPage from './pages/indicators/NewIndicatorPage';
 import EditIndicatorPage from './pages/indicators/EditIndicatorPage';
 import DataEntryPage from './pages/indicators/DataEntryPage';
 import ChartsPage from './pages/charts/ChartsPage';
+import PerformanceListPage from './pages/performance/PerformanceListPage';
+import MyTargetsPage from './pages/performance/MyTargetsPage';
+import TargetManagementPage from './pages/performance/TargetManagementPage';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
 // CSS imports
@@ -23,6 +26,7 @@ import './styles/pages/indicator-list.css';
 import './styles/pages/indicator-form.css';
 import './styles/pages/data-entry.css';
 import './styles/pages/charts.css';
+import './styles/pages/performance.css';
 
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -124,6 +128,32 @@ function AppRoutes() {
           element={
             <PrivateRoute>
               <ChartsPage />
+            </PrivateRoute>
+          } 
+        />
+        
+        {/* Performance Routes */}
+        <Route 
+          path="/performance" 
+          element={
+            <PrivateRoute>
+              <PerformanceListPage />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/performance/my-targets" 
+          element={
+            <PrivateRoute>
+              <MyTargetsPage />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/performance/target-management" 
+          element={
+            <PrivateRoute>
+              <TargetManagementPage />
             </PrivateRoute>
           } 
         />

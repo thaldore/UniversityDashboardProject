@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UniversityDashBoardProject.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using UniversityDashBoardProject.Infrastructure.Persistence;
 namespace UniversityDashboard.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250926222056_AddPerformanceSystem")]
+    partial class AddPerformanceSystem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -703,16 +706,10 @@ namespace UniversityDashboard.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTime>("PeriodEndDate")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("PeriodName")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("PeriodStartDate")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("ResultEntryEndDate")
                         .HasColumnType("timestamp with time zone");

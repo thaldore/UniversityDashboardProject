@@ -30,6 +30,13 @@ namespace UniversityDashBoardProject.Infrastructure.Persistence
         public DbSet<ChartFilterIndicator> ChartFilterIndicators { get; set; }
         public DbSet<ChartGroupIndicator> ChartGroupIndicators { get; set; }
 
+        // Performance related DbSets
+        public DbSet<PerformancePeriod> PerformancePeriods { get; set; }
+        public DbSet<PerformancePeriodAssignment> PerformancePeriodAssignments { get; set; }
+        public DbSet<PerformanceTarget> PerformanceTargets { get; set; }
+        public DbSet<PerformanceTargetProgress> PerformanceTargetProgresses { get; set; }
+        public DbSet<PerformanceScoring> PerformanceScorings { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -320,6 +327,155 @@ namespace UniversityDashBoardProject.Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(cgi => cgi.IndicatorId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Performance Period configuration
+            builder.Entity<PerformancePeriod>(entity =>
+            {
+                entity.HasKey(pp => pp.PeriodId);
+                
+                entity.Property(pp => pp.PeriodName)
+                    .HasMaxLength(200)
+                    .IsRequired();
+                    
+                entity.HasOne(pp => pp.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(pp => pp.CreatedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Performance Period Assignment configuration
+            builder.Entity<PerformancePeriodAssignment>(entity =>
+            {
+                entity.HasKey(ppa => ppa.AssignmentId);
+                
+                entity.HasOne(ppa => ppa.Period)
+                    .WithMany(pp => pp.PeriodAssignments)
+                    .HasForeignKey(ppa => ppa.PeriodId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(ppa => ppa.Department)
+                    .WithMany()
+                    .HasForeignKey(ppa => ppa.DepartmentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                    
+                entity.HasOne(ppa => ppa.User)
+                    .WithMany()
+                    .HasForeignKey(ppa => ppa.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                    
+                entity.HasOne(ppa => ppa.TargetEntryUser)
+                    .WithMany()
+                    .HasForeignKey(ppa => ppa.TargetEntryUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                    
+                entity.Property(ppa => ppa.AssignmentType)
+                    .HasConversion<string>();
+            });
+
+            // Performance Target configuration
+            builder.Entity<PerformanceTarget>(entity =>
+            {
+                entity.HasKey(pt => pt.TargetId);
+                
+                entity.Property(pt => pt.TargetName)
+                    .HasMaxLength(200)
+                    .IsRequired();
+                    
+                entity.Property(pt => pt.Unit)
+                    .HasMaxLength(50)
+                    .IsRequired();
+                    
+                entity.Property(pt => pt.TargetValue)
+                    .HasPrecision(20, 4);
+                    
+                entity.Property(pt => pt.ActualValue)
+                    .HasPrecision(20, 4);
+                    
+                entity.Property(pt => pt.Weight)
+                    .HasPrecision(5, 2);
+                    
+                entity.Property(pt => pt.Direction)
+                    .HasConversion<string>();
+                    
+                entity.Property(pt => pt.Status)
+                    .HasConversion<string>();
+                
+                entity.HasOne(pt => pt.Period)
+                    .WithMany(pp => pp.Targets)
+                    .HasForeignKey(pt => pt.PeriodId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                    
+                entity.HasOne(pt => pt.Department)
+                    .WithMany()
+                    .HasForeignKey(pt => pt.DepartmentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                    
+                entity.HasOne(pt => pt.User)
+                    .WithMany()
+                    .HasForeignKey(pt => pt.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                    
+                entity.HasOne(pt => pt.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(pt => pt.CreatedBy)
+                    .OnDelete(DeleteBehavior.Restrict);
+                    
+                entity.HasOne(pt => pt.AssignedToUser)
+                    .WithMany()
+                    .HasForeignKey(pt => pt.AssignedToUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                    
+                entity.HasOne(pt => pt.AssignedToDepartment)
+                    .WithMany()
+                    .HasForeignKey(pt => pt.AssignedToDepartmentId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Performance Target Progress configuration
+            builder.Entity<PerformanceTargetProgress>(entity =>
+            {
+                entity.HasKey(ptp => ptp.ProgressId);
+                
+                entity.Property(ptp => ptp.ProgressValue)
+                    .HasPrecision(20, 4);
+                    
+                entity.Property(ptp => ptp.Status)
+                    .HasConversion<string>();
+                
+                entity.HasOne(ptp => ptp.Target)
+                    .WithMany(pt => pt.Progresses)
+                    .HasForeignKey(ptp => ptp.TargetId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasOne(ptp => ptp.EnteredByUser)
+                    .WithMany()
+                    .HasForeignKey(ptp => ptp.EnteredBy)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Performance Scoring configuration
+            builder.Entity<PerformanceScoring>(entity =>
+            {
+                entity.HasKey(ps => ps.ScoringId);
+                
+                entity.Property(ps => ps.MinValue)
+                    .HasPrecision(20, 4);
+                    
+                entity.Property(ps => ps.MaxValue)
+                    .HasPrecision(20, 4);
+                    
+                entity.Property(ps => ps.Score)
+                    .HasPrecision(20, 4);
+                    
+                entity.Property(ps => ps.LetterGrade)
+                    .HasMaxLength(10)
+                    .IsRequired();
+                
+                entity.HasOne(ps => ps.Period)
+                    .WithMany(pp => pp.Scorings)
+                    .HasForeignKey(ps => ps.PeriodId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }
