@@ -52,5 +52,9 @@ namespace UniversityDashBoardProject.Application.Interfaces
         Task<List<UserDto>> GetUsersByDepartmentAsync(int departmentId);
         Task<decimal> CalculateTargetScoreAsync(int targetId, decimal actualValue);
         Task<decimal> CalculateTotalWeightAsync(int? departmentId = null, int? userId = null, int? periodId = null);
+        
+        // Authorization Methods
+        Task<bool> CanUserCreateDepartmentTargetAsync(int userId, int periodId, int departmentId);
+        Task<List<DepartmentDto>> GetUserAuthorizedDepartmentsAsync(int userId, int periodId);
     }
 }

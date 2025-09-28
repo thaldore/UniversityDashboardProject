@@ -134,7 +134,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     DepartmentId = assignmentRequest.DepartmentId,
                     UserId = assignmentRequest.UserId,
                     AssignmentType = assignmentRequest.AssignmentType,
-                    TargetEntryUserId = assignmentRequest.TargetEntryUserId,
+                    TargetEntryRole = assignmentRequest.TargetEntryRole,
+                    ResultEntryRole = assignmentRequest.ResultEntryRole,
                     CreatedAt = DateTime.UtcNow
                 };
                 _context.PerformancePeriodAssignments.Add(assignment);
@@ -234,6 +235,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 .Include(t => t.Department)
                 .Include(t => t.User)
                 .Include(t => t.CreatedByUser)
+                .Include(t => t.Progresses)
                 .AsQueryable();
 
             if (periodId.HasValue)
@@ -254,15 +256,32 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     DepartmentName = t.Department != null ? t.Department.DepartmentName : null,
                     UserName = t.User != null ? $"{t.User.FirstName} {t.User.LastName}" : null,
                     TargetValue = t.TargetValue,
-                    ActualValue = t.ActualValue,
+                    ActualValue = t.Progresses.Where(p => p.Status == ProgressStatus.Approved || p.Status == ProgressStatus.Draft).Sum(p => p.ProgressValue),
                     Unit = t.Unit,
                     Weight = t.Weight,
                     Direction = t.Direction,
                     Status = t.Status,
                     CreatedAt = t.CreatedAt,
-                    CompletionRate = t.ActualValue.HasValue && t.TargetValue > 0 
-                        ? (t.ActualValue.Value / t.TargetValue) * 100 
-                        : null
+                    CompletionRate = t.Progresses.Where(p => p.Status == ProgressStatus.Approved || p.Status == ProgressStatus.Draft).Sum(p => p.ProgressValue) > 0 && t.TargetValue > 0 
+                        ? (t.Progresses.Where(p => p.Status == ProgressStatus.Approved || p.Status == ProgressStatus.Draft).Sum(p => p.ProgressValue) / t.TargetValue) * 100 
+                        : null,
+                    ProgressId = t.Progresses.Where(p => p.Status == ProgressStatus.Draft).OrderByDescending(p => p.CreatedAt).Select(p => p.ProgressId).FirstOrDefault(),
+                    Score = t.ActualValue.HasValue && t.TargetValue > 0 ? 
+                        _context.PerformanceScorings
+                            .Where(s => s.PeriodId == t.PeriodId)
+                            .Where(s => s.IsForNegativeTarget == (t.Direction == TargetDirection.Negative))
+                            .Where(s => ((t.ActualValue.Value / t.TargetValue) * 100) >= s.MinValue && (s.MaxValue == null || ((t.ActualValue.Value / t.TargetValue) * 100) <= s.MaxValue))
+                            .OrderBy(s => s.DisplayOrder)
+                            .Select(s => s.Score)
+                            .FirstOrDefault() : null,
+                    LetterGrade = t.ActualValue.HasValue && t.TargetValue > 0 ? 
+                        _context.PerformanceScorings
+                            .Where(s => s.PeriodId == t.PeriodId)
+                            .Where(s => s.IsForNegativeTarget == (t.Direction == TargetDirection.Negative))
+                            .Where(s => ((t.ActualValue.Value / t.TargetValue) * 100) >= s.MinValue && (s.MaxValue == null || ((t.ActualValue.Value / t.TargetValue) * 100) <= s.MaxValue))
+                            .OrderBy(s => s.DisplayOrder)
+                            .Select(s => s.LetterGrade)
+                            .FirstOrDefault() : null
                 })
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
@@ -462,7 +481,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
             if (request.IsApproved)
             {
-                target.Status = TargetStatus.Approved;
+                // Hedef onaylandığında gerçekleştirme girişi için ProgressDraft durumuna geç
+                target.Status = TargetStatus.ProgressDraft;
                 target.RejectionReason = null;
             }
             else
@@ -583,18 +603,32 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
         public async Task<bool> ApproveRejectPerformanceTargetProgressAsync(int progressId, ApproveRejectProgressRequest request)
         {
-            var progress = await _context.PerformanceTargetProgresses.FindAsync(progressId);
+            var progress = await _context.PerformanceTargetProgresses
+                .Include(p => p.Target)
+                .FirstOrDefaultAsync(p => p.ProgressId == progressId);
+            
             if (progress == null) return false;
 
             if (request.IsApproved)
             {
                 progress.Status = ProgressStatus.Approved;
                 progress.RejectionReason = null;
+                
+                // Gerçekleştirme onaylandığında hedefin durumunu ProgressApproved yap
+                progress.Target.Status = TargetStatus.ProgressApproved;
+                progress.Target.UpdatedAt = DateTime.UtcNow;
+                
+                // Hedef tamamlandığında scoring hesapla
+                await CalculateTargetScoreAsync(progress.Target.TargetId);
             }
             else
             {
                 progress.Status = ProgressStatus.Rejected;
                 progress.RejectionReason = request.Reason;
+                
+                // Gerçekleştirme reddedildiğinde hedefin durumunu ProgressRejected yap
+                progress.Target.Status = TargetStatus.ProgressRejected;
+                progress.Target.UpdatedAt = DateTime.UtcNow;
             }
 
             await _context.SaveChangesAsync();
@@ -680,7 +714,6 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             var assignments = await _context.PerformancePeriodAssignments
                 .Include(a => a.Department)
                 .Include(a => a.User)
-                .Include(a => a.TargetEntryUser)
                 .Where(a => a.PeriodId == periodId)
                 .Select(a => new PerformanceAssignmentDto
                 {
@@ -692,8 +725,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     UserName = a.User != null ? $"{a.User.FirstName} {a.User.LastName}" : null,
                     AssignmentType = a.AssignmentType,
                     AssignmentTypeText = a.AssignmentType == AssignmentType.Department ? "Departman" : "Kullanıcı",
-                    TargetEntryUserId = a.TargetEntryUserId,
-                    TargetEntryUserName = a.TargetEntryUser != null ? $"{a.TargetEntryUser.FirstName} {a.TargetEntryUser.LastName}" : null,
+                    TargetEntryRole = a.TargetEntryRole,
+                    ResultEntryRole = a.ResultEntryRole,
                     CreatedAt = a.CreatedAt
                 })
                 .ToListAsync();
@@ -709,7 +742,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 DepartmentId = request.DepartmentId,
                 UserId = request.UserId,
                 AssignmentType = request.AssignmentType,
-                TargetEntryUserId = request.TargetEntryUserId,
+                TargetEntryRole = request.TargetEntryRole,
+                ResultEntryRole = request.ResultEntryRole,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -737,6 +771,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             var contributions = await _context.PerformanceTargets
                 .Include(t => t.Department)
                 .Include(t => t.User)
+                .Include(t => t.Progresses)
                 .Where(t => t.TargetName == _context.PerformanceTargets
                     .Where(tt => tt.TargetId == targetId)
                     .Select(tt => tt.TargetName)
@@ -748,7 +783,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     Unit = t.Unit,
                     ContributionCenter = t.Department != null ? t.Department.DepartmentName : 
                                       t.User != null ? $"{t.User.FirstName} {t.User.LastName}" : "Bilinmiyor",
-                    ContributionAmount = t.ActualValue ?? 0,
+                    ContributionAmount = t.Progresses.Where(p => p.Status == ProgressStatus.Approved).Sum(p => p.ProgressValue),
                     TotalAmount = 0, // Will be calculated
                     ContributionPercentage = 0 // Will be calculated
                 })
@@ -856,6 +891,127 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 query = query.Where(t => t.PeriodId == periodId.Value);
 
             return await query.SumAsync(t => t.Weight);
+        }
+
+        public async Task<bool> CanUserCreateDepartmentTargetAsync(int userId, int periodId, int departmentId)
+        {
+            // Kullanıcının kendi departmanı için hedef oluşturma yetkisi var mı kontrol et
+            var user = await _context.Users
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null) return false;
+
+            // Kullanıcının departmanını kontrol et
+            if (user.DepartmentId != departmentId) return false;
+
+            // Kullanıcının rolünü kontrol et
+            var userRoles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
+
+            // Performans dönemi atamalarını kontrol et
+            var periodAssignment = await _context.PerformancePeriodAssignments
+                .FirstOrDefaultAsync(pa => pa.PeriodId == periodId && 
+                                         pa.AssignmentType == AssignmentType.Department && 
+                                         pa.DepartmentId == departmentId);
+
+            if (periodAssignment == null) return false;
+
+            // Hedef girişi için yetkili rol kontrolü
+            if (string.IsNullOrEmpty(periodAssignment.TargetEntryRole))
+                return false;
+
+            if (periodAssignment.TargetEntryRole == "All")
+                return true;
+
+            return userRoles.Contains(periodAssignment.TargetEntryRole);
+        }
+
+        public async Task<List<DepartmentDto>> GetUserAuthorizedDepartmentsAsync(int userId, int periodId)
+        {
+            var user = await _context.Users
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null) return new List<DepartmentDto>();
+
+            var userRoles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
+            
+            // Kullanıcının departmanı için yetkili mi kontrol et
+            var authorizedDepartments = new List<DepartmentDto>();
+
+            if (user.DepartmentId.HasValue)
+            {
+                var periodAssignment = await _context.PerformancePeriodAssignments
+                    .Include(pa => pa.Department)
+                    .FirstOrDefaultAsync(pa => pa.PeriodId == periodId && 
+                                             pa.AssignmentType == AssignmentType.Department && 
+                                             pa.DepartmentId == user.DepartmentId.Value);
+
+                if (periodAssignment != null && !string.IsNullOrEmpty(periodAssignment.TargetEntryRole))
+                {
+                    if (periodAssignment.TargetEntryRole == "All" || userRoles.Contains(periodAssignment.TargetEntryRole))
+                    {
+                        if (periodAssignment.Department != null)
+                        {
+                            authorizedDepartments.Add(new DepartmentDto
+                            {
+                                DepartmentId = periodAssignment.Department.DepartmentId,
+                                DepartmentName = periodAssignment.Department.DepartmentName,
+                                Description = null,
+                                IsActive = periodAssignment.Department.IsActive
+                            });
+                        }
+                    }
+                }
+            }
+
+            return authorizedDepartments;
+        }
+
+        #endregion
+
+        #region Scoring Methods
+
+        public async Task<(decimal? Score, string? LetterGrade)> CalculateTargetScoreAsync(int targetId)
+        {
+            var target = await _context.PerformanceTargets
+                .Include(t => t.Period)
+                .Include(t => t.Progresses)
+                .FirstOrDefaultAsync(t => t.TargetId == targetId);
+
+            if (target == null) return (null, null);
+
+            // Gerçekleşme değerini hesapla
+            var actualValue = target.Progresses
+                .Where(p => p.Status == ProgressStatus.Approved)
+                .Sum(p => p.ProgressValue);
+
+            if (actualValue <= 0) return (null, null);
+
+            // Tamamlanma oranını hesapla
+            var completionRate = (actualValue / target.TargetValue) * 100;
+
+            // Scoring tablosundan uygun puanı bul
+            var scoring = await _context.PerformanceScorings
+                .Where(s => s.PeriodId == target.PeriodId)
+                .Where(s => s.IsForNegativeTarget == (target.Direction == TargetDirection.Negative))
+                .Where(s => completionRate >= s.MinValue && (s.MaxValue == null || completionRate <= s.MaxValue))
+                .OrderBy(s => s.DisplayOrder)
+                .FirstOrDefaultAsync();
+
+            if (scoring != null)
+            {
+                // Hedefin actual value'sunu güncelle
+                target.ActualValue = actualValue;
+                target.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+                return (scoring.Score, scoring.LetterGrade);
+            }
+
+            return (null, null);
         }
 
         #endregion

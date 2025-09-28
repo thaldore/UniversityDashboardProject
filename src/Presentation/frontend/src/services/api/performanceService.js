@@ -156,6 +156,14 @@ const performanceService = {
     const queryString = queryParams.toString();
     const url = queryString ? `/performance/weight/total?${queryString}` : '/performance/weight/total';
     return await apiClient.get(url);
+  },
+
+  async getUserAuthorizedDepartments(userId, periodId) {
+    return await apiClient.get(`/performance/user/${userId}/authorized-departments?periodId=${periodId}`);
+  },
+
+  async canUserCreateDepartmentTarget(userId, periodId, departmentId) {
+    return await apiClient.get(`/performance/user/${userId}/can-create-department-target?periodId=${periodId}&departmentId=${departmentId}`);
   }
 };
 

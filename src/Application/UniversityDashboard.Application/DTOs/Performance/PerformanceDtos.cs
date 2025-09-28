@@ -87,6 +87,9 @@ namespace UniversityDashBoardProject.Application.DTOs.Performance
         public TargetStatus Status { get; set; }
         public DateTime CreatedAt { get; set; }
         public decimal? CompletionRate { get; set; }
+        public int? ProgressId { get; set; } // En son Draft durumundaki progress ID'si
+        public decimal? Score { get; set; } // Puan
+        public string? LetterGrade { get; set; } // Harf notu
     }
 
     public class PerformanceTargetProgressDto
@@ -126,8 +129,8 @@ namespace UniversityDashBoardProject.Application.DTOs.Performance
         public string? UserName { get; set; }
         public AssignmentType AssignmentType { get; set; }
         public string AssignmentTypeText { get; set; } = string.Empty;
-        public int? TargetEntryUserId { get; set; }
-        public string? TargetEntryUserName { get; set; }
+        public string? TargetEntryRole { get; set; }
+        public string? ResultEntryRole { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 

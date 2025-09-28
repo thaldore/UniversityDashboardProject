@@ -25,6 +25,17 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
   const [errors, setErrors] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [users, setUsers] = useState([]);
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState('');
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+
+  // Filtrelenmiş listeler
+  const filteredDepartments = departments.filter(dept =>
+    dept.departmentName.toLowerCase().includes(departmentSearchTerm.toLowerCase())
+  );
+
+  const filteredUsers = users.filter(user =>
+    `${user.firstName} ${user.lastName}`.toLowerCase().includes(userSearchTerm.toLowerCase())
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -135,7 +146,8 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
         assignmentType: 1, // Department
         departmentId: null,
         userId: null,
-        targetEntryUserId: null
+        targetEntryRole: 'Manager',
+        resultEntryRole: 'Manager'
       }]
     }));
   };
@@ -152,14 +164,15 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
   // Yeni atama fonksiyonları
   const handleDepartmentAssignment = (departmentId, isAssigned) => {
     if (isAssigned) {
-      // Departman ataması ekle
+      // Departman ataması ekle - varsayılan olarak Manager rolü
       setFormData(prev => ({
         ...prev,
         assignments: [...prev.assignments, {
           assignmentType: 1,
           departmentId: departmentId,
           userId: null,
-          targetEntryUserId: null
+          targetEntryRole: 'Manager',
+          resultEntryRole: 'Manager'
         }]
       }));
     } else {
@@ -173,14 +186,15 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
 
   const handleUserAssignment = (userId, isAssigned) => {
     if (isAssigned) {
-      // Kullanıcı ataması ekle
+      // Kullanıcı ataması ekle - kullanıcı kendisi için hedef girişi yapacak
       setFormData(prev => ({
         ...prev,
         assignments: [...prev.assignments, {
           assignmentType: 2,
           departmentId: null,
           userId: userId,
-          targetEntryUserId: null
+          targetEntryRole: 'User', // Kullanıcı kendisi için hedef girişi yapacak
+          resultEntryRole: 'User'
         }]
       }));
     } else {
@@ -192,54 +206,98 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
     }
   };
 
-  const getAssignmentTargetEntryUserId = (id) => {
+  // Rol yönetimi fonksiyonları
+  const getAssignmentTargetEntryRole = (id) => {
     const assignment = formData.assignments.find(a => 
       (a.assignmentType === 1 && a.departmentId === id) || 
       (a.assignmentType === 2 && a.userId === id)
     );
-    return assignment?.targetEntryUserId || null;
+    return assignment?.targetEntryRole || 'Manager';
   };
 
-  const updateDepartmentTargetEntryUser = (departmentId, userId) => {
-    setFormData(prev => ({
-      ...prev,
-      assignments: prev.assignments.map(a => 
-        a.assignmentType === 1 && a.departmentId === departmentId 
-          ? { ...a, targetEntryUserId: userId }
-          : a
-      )
-    }));
-  };
-
-  const updateUserTargetEntryUser = (userId, targetEntryUserId) => {
-    setFormData(prev => ({
-      ...prev,
-      assignments: prev.assignments.map(a => 
-        a.assignmentType === 2 && a.userId === userId 
-          ? { ...a, targetEntryUserId: targetEntryUserId }
-          : a
-      )
-    }));
-  };
-
-  // Yeni rol yönetimi fonksiyonları
-  const getAssignmentRole = (id) => {
+  const getAssignmentResultEntryRole = (id) => {
     const assignment = formData.assignments.find(a => 
       (a.assignmentType === 1 && a.departmentId === id) || 
       (a.assignmentType === 2 && a.userId === id)
     );
-    return assignment?.role || null;
+    return assignment?.resultEntryRole || 'Manager';
   };
 
-  const updateDepartmentRole = (departmentId, role) => {
+  const updateDepartmentTargetEntryRole = (departmentId, role) => {
     setFormData(prev => ({
       ...prev,
       assignments: prev.assignments.map(a => 
         a.assignmentType === 1 && a.departmentId === departmentId 
-          ? { ...a, role: role }
+          ? { ...a, targetEntryRole: role }
           : a
       )
     }));
+  };
+
+  const updateDepartmentResultEntryRole = (departmentId, role) => {
+    setFormData(prev => ({
+      ...prev,
+      assignments: prev.assignments.map(a => 
+        a.assignmentType === 1 && a.departmentId === departmentId 
+          ? { ...a, resultEntryRole: role }
+          : a
+      )
+    }));
+  };
+
+  // Toplu seçim fonksiyonları
+  const handleSelectAllDepartments = (selectAll) => {
+    if (selectAll) {
+      // Filtrelenmiş departmanları seç
+      const newAssignments = filteredDepartments.map(dept => ({
+        assignmentType: 1,
+        departmentId: dept.departmentId,
+        userId: null,
+        targetEntryRole: 'Manager',
+        resultEntryRole: 'Manager'
+      }));
+      
+      setFormData(prev => ({
+        ...prev,
+        assignments: [
+          ...prev.assignments.filter(a => a.assignmentType !== 1), // Mevcut departman atamalarını kaldır
+          ...newAssignments
+        ]
+      }));
+    } else {
+      // Tüm departman atamalarını kaldır
+      setFormData(prev => ({
+        ...prev,
+        assignments: prev.assignments.filter(a => a.assignmentType !== 1)
+      }));
+    }
+  };
+
+  const handleSelectAllUsers = (selectAll) => {
+    if (selectAll) {
+      // Filtrelenmiş kullanıcıları seç
+      const newAssignments = filteredUsers.map(user => ({
+        assignmentType: 2,
+        departmentId: null,
+        userId: user.id,
+        targetEntryRole: 'User',
+        resultEntryRole: 'User'
+      }));
+      
+      setFormData(prev => ({
+        ...prev,
+        assignments: [
+          ...prev.assignments.filter(a => a.assignmentType !== 2), // Mevcut kullanıcı atamalarını kaldır
+          ...newAssignments
+        ]
+      }));
+    } else {
+      // Tüm kullanıcı atamalarını kaldır
+      setFormData(prev => ({
+        ...prev,
+        assignments: prev.assignments.filter(a => a.assignmentType !== 2)
+      }));
+    }
   };
 
   const removeAssignment = (index) => {
@@ -591,9 +649,42 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
               
               {/* Departman Atamaları */}
               <div className="assignment-type-section">
-                <h4>Departman Atamaları</h4>
+                <div className="section-header">
+                  <h4>Departman Atamaları</h4>
+                  <div className="bulk-actions">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllDepartments(true)}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Tümünü Seç
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllDepartments(false)}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Tümünü Kaldır
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Departman Arama */}
+                <div className="search-section">
+                  <div className="form-group">
+                    <label className="form-label">Departman Ara</label>
+                    <input
+                      type="text"
+                      value={departmentSearchTerm}
+                      onChange={(e) => setDepartmentSearchTerm(e.target.value)}
+                      className="form-input"
+                      placeholder="Departman adı ile arayın..."
+                    />
+                  </div>
+                </div>
+                
                 <div className="department-assignments">
-                  {departments.map(dept => {
+                  {filteredDepartments.map(dept => {
                     const isAssigned = formData.assignments.some(a => a.assignmentType === 1 && a.departmentId === dept.departmentId);
                     return (
                       <div key={dept.departmentId} className="assignment-card">
@@ -612,16 +703,29 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
                         {isAssigned && (
                           <div className="assignment-details">
                             <div className="form-group">
-                              <label className="form-label">Hedef Girişi ve Sonuç Girişi Yapacak Rol</label>
+                              <label className="form-label">Hedef Girişi Yapacak Rol</label>
                               <select
-                                value={getAssignmentRole(dept.departmentId) || ''}
-                                onChange={(e) => updateDepartmentRole(dept.departmentId, e.target.value)}
+                                value={getAssignmentTargetEntryRole(dept.departmentId)}
+                                onChange={(e) => updateDepartmentTargetEntryRole(dept.departmentId, e.target.value)}
                                 className="form-input"
                               >
-                                <option value="">Rol Seçin</option>
-                                <option value="manager">Yönetici (Manager)</option>
-                                <option value="user">Kullanıcı (User)</option>
-                                <option value="all">Tüm Roller</option>
+                                <option value="All">Tüm Roller</option>
+                                <option value="Admin">Admin</option>
+                                <option value="Manager">Yönetici (Manager)</option>
+                                <option value="User">Kullanıcı (User)</option>
+                              </select>
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Sonuç Girişi Yapacak Rol</label>
+                              <select
+                                value={getAssignmentResultEntryRole(dept.departmentId)}
+                                onChange={(e) => updateDepartmentResultEntryRole(dept.departmentId, e.target.value)}
+                                className="form-input"
+                              >
+                                <option value="All">Tüm Roller</option>
+                                <option value="Admin">Admin</option>
+                                <option value="Manager">Yönetici (Manager)</option>
+                                <option value="User">Kullanıcı (User)</option>
                               </select>
                             </div>
                           </div>
@@ -634,18 +738,51 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
 
               {/* Kullanıcı Atamaları */}
               <div className="assignment-type-section">
-                <h4>Kullanıcı Atamaları</h4>
+                <div className="section-header">
+                  <h4>Kullanıcı Atamaları</h4>
+                  <div className="bulk-actions">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllUsers(true)}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Tümünü Seç
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllUsers(false)}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Tümünü Kaldır
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Kullanıcı Arama */}
+                <div className="search-section">
+                  <div className="form-group">
+                    <label className="form-label">Kullanıcı Ara</label>
+                    <input
+                      type="text"
+                      value={userSearchTerm}
+                      onChange={(e) => setUserSearchTerm(e.target.value)}
+                      className="form-input"
+                      placeholder="Kullanıcı adı ile arayın..."
+                    />
+                  </div>
+                </div>
+                
                 <div className="user-assignments">
-                  {users.map(user => {
-                    const isAssigned = formData.assignments.some(a => a.assignmentType === 2 && a.userId === user.userId);
+                  {filteredUsers.map(user => {
+                    const isAssigned = formData.assignments.some(a => a.assignmentType === 2 && a.userId === user.id);
                     return (
-                      <div key={user.userId} className="assignment-card">
+                      <div key={user.id} className="assignment-card">
                         <div className="assignment-header">
                           <label className="assignment-checkbox">
                             <input
                               type="checkbox"
                               checked={isAssigned}
-                              onChange={(e) => handleUserAssignment(user.userId, e.target.checked)}
+                              onChange={(e) => handleUserAssignment(user.id, e.target.checked)}
                             />
                             <span className="checkmark"></span>
                             {user.firstName} {user.lastName}

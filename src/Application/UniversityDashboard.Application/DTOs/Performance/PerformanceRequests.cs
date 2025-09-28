@@ -110,7 +110,8 @@ namespace UniversityDashBoardProject.Application.DTOs.Performance
         public AssignmentType AssignmentType { get; set; }
         public int? DepartmentId { get; set; }
         public int? UserId { get; set; }
-        public int? TargetEntryUserId { get; set; }
+        public string? TargetEntryRole { get; set; } = "Manager"; // Varsayılan olarak Manager
+        public string? ResultEntryRole { get; set; } = "Manager"; // Varsayılan olarak Manager
     }
 
     public class ApproveRejectTargetRequest

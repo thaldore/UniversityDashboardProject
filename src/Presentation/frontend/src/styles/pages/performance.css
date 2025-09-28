@@ -679,6 +679,67 @@
   overflow-y: auto;
 }
 
+/* Modal genişletme */
+.performance-target-form .modal-container {
+  max-width: 800px;
+  width: 90%;
+}
+
+/* Departman hedef butonları */
+.department-target-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-left: var(--space-4);
+}
+
+.action-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  margin-right: var(--space-2);
+}
+
+.department-target-actions .btn {
+  white-space: nowrap;
+}
+
+
+/* Arama çubukları */
+.search-section {
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  background-color: var(--surface-soft);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.search-section .form-group {
+  margin-bottom: 0;
+}
+
+.search-section .form-label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-2);
+  color: var(--text-primary);
+}
+
+.search-section .form-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  transition: border-color 0.2s ease;
+}
+
+.search-section .form-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.1);
+}
+
 .target-info {
   background: var(--info-50);
   padding: 1rem;
@@ -1090,13 +1151,30 @@
   margin-bottom: 2rem;
 }
 
-.assignment-type-section h4 {
-  color: var(--gray-700);
-  font-size: 1rem;
-  font-weight: 600;
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 2px solid var(--primary-100);
+}
+
+.section-header h4 {
+  color: var(--gray-700);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.bulk-actions .btn {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
 }
 
 .department-assignments,

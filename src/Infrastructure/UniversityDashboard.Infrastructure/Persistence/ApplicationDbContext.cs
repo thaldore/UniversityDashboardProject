@@ -349,6 +349,12 @@ namespace UniversityDashBoardProject.Infrastructure.Persistence
             {
                 entity.HasKey(ppa => ppa.AssignmentId);
                 
+                entity.Property(ppa => ppa.TargetEntryRole)
+                    .HasMaxLength(50);
+                    
+                entity.Property(ppa => ppa.ResultEntryRole)
+                    .HasMaxLength(50);
+                
                 entity.HasOne(ppa => ppa.Period)
                     .WithMany(pp => pp.PeriodAssignments)
                     .HasForeignKey(ppa => ppa.PeriodId)
@@ -362,11 +368,6 @@ namespace UniversityDashBoardProject.Infrastructure.Persistence
                 entity.HasOne(ppa => ppa.User)
                     .WithMany()
                     .HasForeignKey(ppa => ppa.UserId)
-                    .OnDelete(DeleteBehavior.Restrict);
-                    
-                entity.HasOne(ppa => ppa.TargetEntryUser)
-                    .WithMany()
-                    .HasForeignKey(ppa => ppa.TargetEntryUserId)
                     .OnDelete(DeleteBehavior.Restrict);
                     
                 entity.Property(ppa => ppa.AssignmentType)

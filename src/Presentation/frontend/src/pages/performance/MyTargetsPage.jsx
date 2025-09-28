@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Target, Plus, TrendingUp, Eye, Edit, Send, CheckCircle, XCircle, Clock, BarChart3, AlertCircle } from 'lucide-react';
+import { Target, Plus, TrendingUp, Eye, Edit, Send, CheckCircle, XCircle, Clock, BarChart3, AlertCircle, Building } from 'lucide-react';
 import performanceService from '../../services/api/performanceService';
 import PerformanceTargetModal from '../../components/performance/PerformanceTargetModal';
 import PerformanceTargetProgressModal from '../../components/performance/PerformanceTargetProgressModal';
 import PerformanceContributionTable from '../../components/performance/PerformanceContributionTable';
+import { useAuth } from '../../context/AuthContext';
 import { 
   getTargetStatusText, 
   getTargetStatusBadgeClass, 
@@ -14,10 +15,12 @@ import {
 } from '../../services/utils/performanceConstants';
 
 const MyTargetsPage = () => {
+  const { user } = useAuth();
   const [targets, setTargets] = useState([]);
   const [userTargets, setUserTargets] = useState([]);
   const [departmentTargets, setDepartmentTargets] = useState([]);
   const [periods, setPeriods] = useState([]);
+  const [authorizedDepartments, setAuthorizedDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showTargetModal, setShowTargetModal] = useState(false);
@@ -25,6 +28,8 @@ const MyTargetsPage = () => {
   const [showContributionModal, setShowContributionModal] = useState(false);
   const [editingTarget, setEditingTarget] = useState(null);
   const [selectedTarget, setSelectedTarget] = useState(null);
+  const [targetModalMode, setTargetModalMode] = useState('user'); // 'user' or 'department'
+  const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [filter, setFilter] = useState('all'); // all, completed, pending
   const [periodFilter, setPeriodFilter] = useState('all'); // all, periodId
 
@@ -32,11 +37,19 @@ const MyTargetsPage = () => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (user && periods.length > 0) {
+      loadAuthorizedDepartments();
+    }
+  }, [user, periods]);
+
   const loadData = async () => {
     await Promise.all([
       loadTargets(),
       loadPeriods()
     ]);
+    // Periods yüklendikten sonra authorized departments'ı yükle
+    await loadAuthorizedDepartments();
   };
 
   const loadTargets = async () => {
@@ -44,14 +57,23 @@ const MyTargetsPage = () => {
     setError(null);
     
     try {
-      const response = await performanceService.getPerformanceTargets({ userId: null }); // Current user's targets
-      const allTargets = response.data;
+      const currentUserId = user?.id; // Auth context'ten al
+      if (!currentUserId) {
+        setError('Kullanıcı bilgisi bulunamadı');
+        return;
+      }
       
-      // Kullanıcı hedefleri (kendisine atanan)
-      const userTargets = allTargets.filter(target => target.assignedToUserId && target.assignedToUserId !== null);
+      // Kullanıcı hedefleri ve departman hedefleri için ayrı çağrılar
+      const [userTargetsResponse, departmentTargetsResponse] = await Promise.all([
+        performanceService.getPerformanceTargets({ userId: currentUserId }),
+        performanceService.getPerformanceTargets({ departmentId: user?.departmentId })
+      ]);
       
-      // Departman hedefleri (departmanına atanan)
-      const departmentTargets = allTargets.filter(target => target.assignedToDepartmentId && target.assignedToDepartmentId !== null);
+      const userTargets = userTargetsResponse.data.filter(target => target.assignedToUserId !== null);
+      const departmentTargets = departmentTargetsResponse.data.filter(target => target.assignedToDepartmentId !== null);
+      
+      // Tüm hedefleri birleştir
+      const allTargets = [...userTargets, ...departmentTargets];
       
       setTargets(allTargets);
       setUserTargets(userTargets);
@@ -73,8 +95,39 @@ const MyTargetsPage = () => {
     }
   };
 
+  const loadAuthorizedDepartments = async () => {
+    try {
+      const currentUserId = user?.id; // Auth context'ten al
+      if (!currentUserId) {
+        setAuthorizedDepartments([]);
+        return;
+      }
+      
+      const currentPeriodId = periods.length > 0 ? periods[0].periodId : null;
+      if (!currentPeriodId) {
+        setAuthorizedDepartments([]);
+        return;
+      }
+      
+      const response = await performanceService.getUserAuthorizedDepartments(currentUserId, currentPeriodId);
+      setAuthorizedDepartments(response.data);
+      console.log('Yetkili departmanlar:', response.data);
+    } catch (error) {
+      console.error('Yetkili departmanlar yüklenirken hata:', error);
+    }
+  };
+
   const handleCreateTarget = () => {
     setEditingTarget(null);
+    setTargetModalMode('user');
+    setSelectedDepartment(null);
+    setShowTargetModal(true);
+  };
+
+  const handleCreateDepartmentTarget = (department) => {
+    setEditingTarget(null);
+    setTargetModalMode('department');
+    setSelectedDepartment(department);
     setShowTargetModal(true);
   };
 
@@ -99,6 +152,8 @@ const MyTargetsPage = () => {
     setShowContributionModal(false);
     setEditingTarget(null);
     setSelectedTarget(null);
+    setTargetModalMode('user');
+    setSelectedDepartment(null);
   };
 
   const handleModalSuccess = () => {
@@ -160,8 +215,24 @@ const MyTargetsPage = () => {
             className="btn btn-primary"
           >
             <Plus size={20} />
-            Yeni Hedef Oluştur
+            Kendim İçin Hedef Oluştur
           </button>
+          {authorizedDepartments.length > 0 && (
+            <div className="department-target-actions">
+              <span className="action-label">Departman için:</span>
+              {authorizedDepartments.map(dept => (
+                <button
+                  key={dept.departmentId}
+                  onClick={() => handleCreateDepartmentTarget(dept)}
+                  className="btn btn-secondary btn-sm"
+                  title={`${dept.departmentName} için hedef oluştur`}
+                >
+                  <Plus size={16} />
+                  {dept.departmentName}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -311,14 +382,14 @@ const MyTargetsPage = () => {
                     </div>
                   )}
 
-                  {target.status === 3 && ( // Approved
+                  {(target.status === 3 || target.status === 5) && ( // Approved veya ProgressDraft
                     <div className="target-actions-section">
                       <button
                         onClick={() => handleAddProgress(target)}
                         className="btn btn-primary"
                       >
                         <TrendingUp size={16} />
-                        İlerleme Ekle
+                        {target.status === 3 ? 'İlerleme Ekle' : 'Gerçekleşme Girişi'}
                       </button>
                     </div>
                   )}
@@ -424,7 +495,7 @@ const MyTargetsPage = () => {
                       </div>
                     )}
 
-                    {target.status === 3 && ( // Approved
+                    {(target.status === 3 || target.status === 5) && ( // Approved veya ProgressDraft
                       <div className="progress-section">
                         <div className="progress-header">
                           <h4>İlerleme Bilgileri</h4>
@@ -445,7 +516,7 @@ const MyTargetsPage = () => {
                             className="btn btn-primary"
                           >
                             <TrendingUp size={16} />
-                            İlerleme Ekle
+                            {target.status === 3 ? 'İlerleme Ekle' : 'Gerçekleşme Girişi'}
                           </button>
                         </div>
                       </div>
@@ -464,9 +535,124 @@ const MyTargetsPage = () => {
               ))}
             </div>
           </div>
-        )}
+          )}
 
-        {/* Hedef Bulunamadı */}
+          {/* Departman Hedefleri */}
+          {departmentTargets.length > 0 && (
+            <div className="targets-section">
+              <h2 className="section-title">
+                <Building size={20} />
+                Departman Hedefleri
+              </h2>
+              <div className="targets-grid">
+                {getFilteredTargets(departmentTargets).map((target) => (
+                  <div key={target.targetId} className="target-card">
+                    <div className="target-header">
+                      <div className="target-title">
+                        <h3>{target.targetName}</h3>
+                        <span className={`status-badge ${getTargetStatusBadgeClass(target.status)}`}>
+                          {getTargetStatusText(target.status)}
+                        </span>
+                      </div>
+                      <div className="target-actions">
+                        {target.status === 1 && ( // Draft
+                          <button
+                            onClick={() => handleSubmitTarget(target.targetId)}
+                            className="btn btn-sm btn-primary"
+                            title="Onaya Gönder"
+                          >
+                            <Send size={16} />
+                          </button>
+                        )}
+                        {target.status === 1 && ( // Draft
+                          <button
+                            onClick={() => handleEditTarget(target)}
+                            className="btn btn-sm btn-secondary"
+                            title="Düzenle"
+                          >
+                            <Edit size={16} />
+                          </button>
+                        )}
+                        {target.status === 7 && ( // ProgressApproved
+                          <button
+                            onClick={() => handleViewContributions(target)}
+                            className="btn btn-sm btn-info"
+                            title="Katkı Analizi"
+                          >
+                            <BarChart3 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="target-content">
+                      <div className="target-info">
+                        <div className="info-row">
+                          <span className="info-label">Dönem:</span>
+                          <span className="info-value">{target.periodName}</span>
+                        </div>
+                        <div className="info-row">
+                          <span className="info-label">Hedef Değeri:</span>
+                          <span className="info-value">{target.targetValue} {target.unit}</span>
+                        </div>
+                        <div className="info-row">
+                          <span className="info-label">Ağırlık:</span>
+                          <span className="info-value">%{target.weight}</span>
+                        </div>
+                        <div className="info-row">
+                          <span className="info-label">Yön:</span>
+                          <span className={`direction-badge ${getTargetDirectionBadgeClass(target.direction)}`}>
+                            {getTargetDirectionText(target.direction)}
+                          </span>
+                        </div>
+                        {target.actualValue !== null && (
+                          <div className="info-row">
+                            <span className="info-label">Gerçekleşen:</span>
+                            <span className="info-value">{target.actualValue} {target.unit}</span>
+                          </div>
+                        )}
+                        {target.completionRate !== null && (
+                          <div className="info-row">
+                            <span className="info-label">Gerçekleşme Oranı:</span>
+                            <span className="info-value">{formatCompletionRate(target.completionRate)}</span>
+                          </div>
+                        )}
+                        {target.score && (
+                          <div className="info-row">
+                            <span className="info-label">Puan:</span>
+                            <span className="info-value">{formatScore(target.score)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {(target.status === 3 || target.status === 5) && ( // Approved veya ProgressDraft
+                        <div className="target-actions-section">
+                          <button
+                            onClick={() => handleAddProgress(target)}
+                            className="btn btn-primary"
+                          >
+                            <TrendingUp size={16} />
+                            {target.status === 3 ? 'İlerleme Ekle' : 'Gerçekleşme Girişi'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="target-footer">
+                      <div className="target-meta">
+                        <span>Oluşturulma: {new Date(target.createdAt).toLocaleDateString('tr-TR')}</span>
+                        {target.updatedAt && (
+                          <span>Güncellenme: {new Date(target.updatedAt).toLocaleDateString('tr-TR')}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Hedef Bulunamadı */}
         {userTargets.length === 0 && departmentTargets.length === 0 && (
           <div className="empty-state">
             <Target size={48} />
@@ -489,6 +675,9 @@ const MyTargetsPage = () => {
         onSuccess={handleModalSuccess}
         target={editingTarget}
         isEdit={!!editingTarget}
+        periodId={periodFilter !== 'all' ? parseInt(periodFilter) : null}
+        targetModalMode={targetModalMode}
+        selectedDepartment={selectedDepartment}
       />
 
       <PerformanceTargetProgressModal

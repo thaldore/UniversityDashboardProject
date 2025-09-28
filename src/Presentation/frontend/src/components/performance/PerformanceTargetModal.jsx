@@ -2,20 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { X, Target, Save, AlertCircle, Users, Building } from 'lucide-react';
 import performanceService from '../../services/api/performanceService';
 import { validatePerformanceTarget } from '../../services/utils/performanceConstants';
+import { useAuth } from '../../context/AuthContext';
 
-const PerformanceTargetModal = ({ isOpen, onClose, onSuccess, target = null, isEdit = false, periodId = null }) => {
+const PerformanceTargetModal = ({ isOpen, onClose, onSuccess, target = null, isEdit = false, periodId = null, targetModalMode = 'user', selectedDepartment = null }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     targetName: '',
     description: '',
     periodId: periodId || null,
-    departmentId: null,
-    userId: null,
+    departmentId: targetModalMode === 'department' ? (selectedDepartment?.departmentId || null) : null,
+    userId: targetModalMode === 'user' ? (user?.id || null) : null,
     targetValue: 0,
     unit: '',
     weight: 0,
     direction: 1, // Positive
-    assignedToUserId: null,
-    assignedToDepartmentId: null
+    assignedToUserId: targetModalMode === 'user' ? (user?.id || null) : null,
+    assignedToDepartmentId: targetModalMode === 'department' ? (selectedDepartment?.departmentId || null) : null
   });
 
   const [loading, setLoading] = useState(false);
@@ -41,9 +43,24 @@ const PerformanceTargetModal = ({ isOpen, onClose, onSuccess, target = null, isE
           assignedToUserId: target.assignedToUserId || null,
           assignedToDepartmentId: target.assignedToDepartmentId || null
         });
+      } else {
+        // Yeni hedef oluştururken modal mode'a göre ayarla
+        setFormData({
+          targetName: '',
+          description: '',
+          periodId: periodId || null,
+          departmentId: targetModalMode === 'department' ? (selectedDepartment?.departmentId || null) : null,
+          userId: targetModalMode === 'user' ? (user?.id || null) : null,
+          targetValue: 0,
+          unit: '',
+          weight: 0,
+          direction: 1,
+          assignedToUserId: targetModalMode === 'user' ? (user?.id || null) : null,
+          assignedToDepartmentId: targetModalMode === 'department' ? (selectedDepartment?.departmentId || null) : null
+        });
       }
     }
-  }, [isOpen, isEdit, target, periodId]);
+  }, [isOpen, isEdit, target, periodId, targetModalMode, selectedDepartment, user]);
 
   const loadData = async () => {
     try {
@@ -81,6 +98,10 @@ const PerformanceTargetModal = ({ isOpen, onClose, onSuccess, target = null, isE
         return;
       }
 
+      console.log('Hedef oluşturma formData:', formData);
+      console.log('TargetModalMode:', targetModalMode);
+      console.log('SelectedDepartment:', selectedDepartment);
+
       if (isEdit) {
         await performanceService.updatePerformanceTarget(target.targetId, formData);
       } else {
@@ -105,7 +126,8 @@ const PerformanceTargetModal = ({ isOpen, onClose, onSuccess, target = null, isE
         <div className="modal-header">
           <h2>
             <Target className="icon" />
-            {isEdit ? 'Performans Hedefi Düzenle' : 'Yeni Performans Hedefi'}
+            {isEdit ? 'Performans Hedefi Düzenle' : 
+             targetModalMode === 'department' ? `Yeni Departman Hedefi - ${selectedDepartment?.departmentName}` : 'Yeni Performans Hedefi'}
           </h2>
           <button className="modal-close" onClick={onClose}>
             <X size={20} />
@@ -236,79 +258,6 @@ const PerformanceTargetModal = ({ isOpen, onClose, onSuccess, target = null, isE
               </div>
             </div>
 
-            {/* Atama Bilgileri */}
-            <div className="form-section">
-              <h3>Atama Bilgileri</h3>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">Departman</label>
-                  <select
-                    name="departmentId"
-                    value={formData.departmentId || ''}
-                    onChange={handleInputChange}
-                    className="form-input"
-                  >
-                    <option value="">Departman Seçin</option>
-                    {departments.map(dept => (
-                      <option key={dept.departmentId} value={dept.departmentId}>
-                        {dept.departmentName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Kullanıcı</label>
-                  <select
-                    name="userId"
-                    value={formData.userId || ''}
-                    onChange={handleInputChange}
-                    className="form-input"
-                  >
-                    <option value="">Kullanıcı Seçin</option>
-                    {users.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.firstName} {user.lastName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Atanan Departman</label>
-                  <select
-                    name="assignedToDepartmentId"
-                    value={formData.assignedToDepartmentId || ''}
-                    onChange={handleInputChange}
-                    className="form-input"
-                  >
-                    <option value="">Departman Seçin</option>
-                    {departments.map(dept => (
-                      <option key={dept.departmentId} value={dept.departmentId}>
-                        {dept.departmentName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Atanan Kullanıcı</label>
-                  <select
-                    name="assignedToUserId"
-                    value={formData.assignedToUserId || ''}
-                    onChange={handleInputChange}
-                    className="form-input"
-                  >
-                    <option value="">Kullanıcı Seçin</option>
-                    {users.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.firstName} {user.lastName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
 
             <div className="form-actions">
               <button

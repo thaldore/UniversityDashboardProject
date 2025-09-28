@@ -186,7 +186,7 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         }
 
         [HttpPost("targets")]
-        [Authorize(Roles = "Admin")]
+        [Authorize] // Tüm yetkili kullanıcılar için
         public async Task<ActionResult<int>> CreatePerformanceTarget([FromBody] CreatePerformanceTargetRequest request)
         {
             try
@@ -637,6 +637,34 @@ namespace UniversityDashBoardProject.WebApi.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Toplam ağırlık hesaplanırken hata oluştu.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("user/{userId}/authorized-departments")]
+        public async Task<ActionResult<List<DepartmentDto>>> GetUserAuthorizedDepartments(int userId, [FromQuery] int periodId)
+        {
+            try
+            {
+                var result = await _performanceService.GetUserAuthorizedDepartmentsAsync(userId, periodId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Kullanıcı yetkili departmanları getirilirken hata oluştu.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("user/{userId}/can-create-department-target")]
+        public async Task<ActionResult<bool>> CanUserCreateDepartmentTarget(int userId, [FromQuery] int periodId, [FromQuery] int departmentId)
+        {
+            try
+            {
+                var result = await _performanceService.CanUserCreateDepartmentTargetAsync(userId, periodId, departmentId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Kullanıcı yetki kontrolü yapılırken hata oluştu.", error = ex.Message });
             }
         }
 

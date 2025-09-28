@@ -107,6 +107,19 @@ const TargetManagementPage = () => {
     }
   };
 
+  const handleApproveRejectProgress = async (progressId, isApproved, reason = '') => {
+    try {
+      await performanceService.approveRejectPerformanceTargetProgress(progressId, {
+        isApproved,
+        reason
+      });
+      loadTargets();
+    } catch (err) {
+      console.error('Gerçekleşme onay/red işlemi sırasında hata:', err);
+      setError('Gerçekleşme onay/red işlemi sırasında bir hata oluştu.');
+    }
+  };
+
   const handleDeleteTarget = async (targetId) => {
     if (window.confirm('Bu hedefi silmek istediğinizden emin misiniz?')) {
       try {
@@ -122,7 +135,7 @@ const TargetManagementPage = () => {
   const filteredTargets = targets.filter(target => {
     const matchesFilter = filter === 'all' || 
       (filter === 'pending' && target.status === 2) || // Submitted
-      (filter === 'approved' && target.status === 3) || // Approved
+      (filter === 'approved' && (target.status === 3 || target.status === 5)) || // Approved veya ProgressDraft
       (filter === 'completed' && target.status === 7); // ProgressApproved
     
     const matchesSearch = searchTerm === '' || 
@@ -331,6 +344,30 @@ const TargetManagementPage = () => {
                               }}
                               className="btn btn-sm btn-danger"
                               title="Reddet"
+                            >
+                              <XCircle size={16} />
+                            </button>
+                          </>
+                        )}
+                        
+                        {target.status === 5 && ( // ProgressDraft - Gerçekleşme onay/red butonları
+                          <>
+                            <button
+                              onClick={() => handleApproveRejectProgress(target.progressId, true)}
+                              className="btn btn-sm btn-success"
+                              title="Gerçekleşmeyi Onayla"
+                            >
+                              <CheckCircle size={16} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const reason = prompt('Gerçekleşme red sebebi:');
+                                if (reason) {
+                                  handleApproveRejectProgress(target.progressId, false, reason);
+                                }
+                              }}
+                              className="btn btn-sm btn-danger"
+                              title="Gerçekleşmeyi Reddet"
                             >
                               <XCircle size={16} />
                             </button>
