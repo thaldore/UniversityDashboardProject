@@ -927,6 +927,89 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             return userRoles.Contains(periodAssignment.TargetEntryRole);
         }
 
+        public async Task<bool> CanUserEditDepartmentTargetAsync(int userId, int targetId)
+        {
+            var target = await _context.PerformanceTargets
+                .Include(t => t.Period)
+                .FirstOrDefaultAsync(t => t.TargetId == targetId);
+
+            if (target == null || target.DepartmentId == null) return false;
+
+            var user = await _context.Users
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null) return false;
+
+            // Kullanıcının departmanını kontrol et
+            if (user.DepartmentId != target.DepartmentId) return false;
+
+            // Kullanıcının rolünü kontrol et
+            var userRoles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
+
+            // Performans dönemi atamalarını kontrol et
+            var periodAssignment = await _context.PerformancePeriodAssignments
+                .FirstOrDefaultAsync(pa => pa.PeriodId == target.PeriodId && 
+                                         pa.AssignmentType == AssignmentType.Department && 
+                                         pa.DepartmentId == target.DepartmentId);
+
+            if (periodAssignment == null) return false;
+
+            // Hedef girişi için yetkili rol kontrolü
+            if (string.IsNullOrEmpty(periodAssignment.TargetEntryRole))
+                return false;
+
+            if (periodAssignment.TargetEntryRole == "All")
+                return true;
+
+            return userRoles.Contains(periodAssignment.TargetEntryRole);
+        }
+
+        public async Task<bool> CanUserSubmitDepartmentTargetAsync(int userId, int targetId)
+        {
+            return await CanUserEditDepartmentTargetAsync(userId, targetId);
+        }
+
+        public async Task<bool> CanUserAddProgressToDepartmentTargetAsync(int userId, int targetId)
+        {
+            var target = await _context.PerformanceTargets
+                .Include(t => t.Period)
+                .FirstOrDefaultAsync(t => t.TargetId == targetId);
+
+            if (target == null || target.DepartmentId == null) return false;
+
+            var user = await _context.Users
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null) return false;
+
+            // Kullanıcının departmanını kontrol et
+            if (user.DepartmentId != target.DepartmentId) return false;
+
+            // Kullanıcının rolünü kontrol et
+            var userRoles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
+
+            // Performans dönemi atamalarını kontrol et
+            var periodAssignment = await _context.PerformancePeriodAssignments
+                .FirstOrDefaultAsync(pa => pa.PeriodId == target.PeriodId && 
+                                         pa.AssignmentType == AssignmentType.Department && 
+                                         pa.DepartmentId == target.DepartmentId);
+
+            if (periodAssignment == null) return false;
+
+            // Sonuç girişi için yetkili rol kontrolü
+            if (string.IsNullOrEmpty(periodAssignment.ResultEntryRole))
+                return false;
+
+            if (periodAssignment.ResultEntryRole == "All")
+                return true;
+
+            return userRoles.Contains(periodAssignment.ResultEntryRole);
+        }
+
         public async Task<List<DepartmentDto>> GetUserAuthorizedDepartmentsAsync(int userId, int periodId)
         {
             var user = await _context.Users

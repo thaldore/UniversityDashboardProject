@@ -17,8 +17,8 @@ const authService = {
     return await apiClient.post('/auth/revoke-token', { username });
   },
 
-  async getProfile(userId) {
-    return await apiClient.get(`/auth/profile/${userId}`);
+  async getProfile() {
+    return await apiClient.get('/auth/profile');
   },
 
   async getUserSummary(userId) {

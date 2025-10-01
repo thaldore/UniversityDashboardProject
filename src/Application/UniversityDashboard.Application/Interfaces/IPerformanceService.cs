@@ -55,6 +55,9 @@ namespace UniversityDashBoardProject.Application.Interfaces
         
         // Authorization Methods
         Task<bool> CanUserCreateDepartmentTargetAsync(int userId, int periodId, int departmentId);
+        Task<bool> CanUserEditDepartmentTargetAsync(int userId, int targetId);
+        Task<bool> CanUserSubmitDepartmentTargetAsync(int userId, int targetId);
+        Task<bool> CanUserAddProgressToDepartmentTargetAsync(int userId, int targetId);
         Task<List<DepartmentDto>> GetUserAuthorizedDepartmentsAsync(int userId, int periodId);
     }
 }

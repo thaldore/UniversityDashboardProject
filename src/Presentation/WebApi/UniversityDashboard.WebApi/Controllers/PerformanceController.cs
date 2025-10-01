@@ -668,6 +668,48 @@ namespace UniversityDashBoardProject.WebApi.Controllers
             }
         }
 
+        [HttpGet("user/{userId}/can-edit-department-target")]
+        public async Task<ActionResult<bool>> CanUserEditDepartmentTarget(int userId, [FromQuery] int targetId)
+        {
+            try
+            {
+                var result = await _performanceService.CanUserEditDepartmentTargetAsync(userId, targetId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Kullanıcı düzenleme yetki kontrolü yapılırken hata oluştu.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("user/{userId}/can-submit-department-target")]
+        public async Task<ActionResult<bool>> CanUserSubmitDepartmentTarget(int userId, [FromQuery] int targetId)
+        {
+            try
+            {
+                var result = await _performanceService.CanUserSubmitDepartmentTargetAsync(userId, targetId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Kullanıcı gönderme yetki kontrolü yapılırken hata oluştu.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("user/{userId}/can-add-progress-to-department-target")]
+        public async Task<ActionResult<bool>> CanUserAddProgressToDepartmentTarget(int userId, [FromQuery] int targetId)
+        {
+            try
+            {
+                var result = await _performanceService.CanUserAddProgressToDepartmentTargetAsync(userId, targetId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Kullanıcı ilerleme ekleme yetki kontrolü yapılırken hata oluştu.", error = ex.Message });
+            }
+        }
+
         #endregion
 
         #region Helper Methods

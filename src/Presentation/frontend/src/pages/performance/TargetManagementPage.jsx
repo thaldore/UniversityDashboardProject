@@ -32,33 +32,22 @@ const TargetManagementPage = () => {
   }, []);
 
   const loadData = async () => {
-    await Promise.all([
-      loadTargets(),
-      loadPeriods()
-    ]);
-  };
-
-  const loadTargets = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await performanceService.getPerformanceTargets();
-      setTargets(response.data);
+      const [targetsResponse, periodsResponse] = await Promise.all([
+        performanceService.getPerformanceTargets(),
+        performanceService.getPerformancePeriods()
+      ]);
+      
+      setTargets(targetsResponse.data);
+      setPeriods(periodsResponse.data);
     } catch (err) {
-      console.error('Hedefler yüklenirken hata:', err);
-      setError('Hedefler yüklenirken bir hata oluştu.');
+      console.error('Veriler yüklenirken hata:', err);
+      setError('Veriler yüklenirken bir hata oluştu.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadPeriods = async () => {
-    try {
-      const response = await performanceService.getPerformancePeriods();
-      setPeriods(response.data);
-    } catch (err) {
-      console.error('Performans dönemleri yüklenirken hata:', err);
     }
   };
 
@@ -91,7 +80,7 @@ const TargetManagementPage = () => {
   };
 
   const handleModalSuccess = () => {
-    loadTargets();
+    loadData();
   };
 
   const handleApproveReject = async (targetId, isApproved, reason = '') => {
@@ -100,7 +89,7 @@ const TargetManagementPage = () => {
         isApproved,
         reason
       });
-      loadTargets();
+      await loadData();
     } catch (err) {
       console.error('Hedef onay/red işlemi sırasında hata:', err);
       setError('Hedef onay/red işlemi sırasında bir hata oluştu.');
@@ -113,7 +102,7 @@ const TargetManagementPage = () => {
         isApproved,
         reason
       });
-      loadTargets();
+      await loadData();
     } catch (err) {
       console.error('Gerçekleşme onay/red işlemi sırasında hata:', err);
       setError('Gerçekleşme onay/red işlemi sırasında bir hata oluştu.');
@@ -124,7 +113,7 @@ const TargetManagementPage = () => {
     if (window.confirm('Bu hedefi silmek istediğinizden emin misiniz?')) {
       try {
         await performanceService.deletePerformanceTarget(targetId);
-        loadTargets();
+        await loadData();
       } catch (err) {
         console.error('Hedef silinirken hata:', err);
         setError('Hedef silinirken bir hata oluştu.');

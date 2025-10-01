@@ -164,6 +164,18 @@ const performanceService = {
 
   async canUserCreateDepartmentTarget(userId, periodId, departmentId) {
     return await apiClient.get(`/performance/user/${userId}/can-create-department-target?periodId=${periodId}&departmentId=${departmentId}`);
+  },
+
+  async canUserEditDepartmentTarget(userId, targetId) {
+    return await apiClient.get(`/performance/user/${userId}/can-edit-department-target?targetId=${targetId}`);
+  },
+
+  async canUserSubmitDepartmentTarget(userId, targetId) {
+    return await apiClient.get(`/performance/user/${userId}/can-submit-department-target?targetId=${targetId}`);
+  },
+
+  async canUserAddProgressToDepartmentTarget(userId, targetId) {
+    return await apiClient.get(`/performance/user/${userId}/can-add-progress-to-department-target?targetId=${targetId}`);
   }
 };
 

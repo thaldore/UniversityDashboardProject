@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Target, Plus, TrendingUp, Eye, Edit, Send, CheckCircle, XCircle, Clock, BarChart3, AlertCircle, Building } from 'lucide-react';
 import performanceService from '../../services/api/performanceService';
 import PerformanceTargetModal from '../../components/performance/PerformanceTargetModal';
@@ -16,11 +16,11 @@ import {
 
 const MyTargetsPage = () => {
   const { user } = useAuth();
-  const [targets, setTargets] = useState([]);
   const [userTargets, setUserTargets] = useState([]);
   const [departmentTargets, setDepartmentTargets] = useState([]);
   const [periods, setPeriods] = useState([]);
   const [authorizedDepartments, setAuthorizedDepartments] = useState([]);
+  const [userPermissions, setUserPermissions] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showTargetModal, setShowTargetModal] = useState(false);
@@ -33,89 +33,85 @@ const MyTargetsPage = () => {
   const [filter, setFilter] = useState('all'); // all, completed, pending
   const [periodFilter, setPeriodFilter] = useState('all'); // all, periodId
 
-  useEffect(() => {
-    loadData();
-  }, []);
 
-  useEffect(() => {
-    if (user && periods.length > 0) {
-      loadAuthorizedDepartments();
+  const loadUserPermissions = useCallback(async (targets) => {
+    try {
+      const currentUserId = user?.id;
+      if (!currentUserId || !targets || targets.length === 0) {
+        setUserPermissions({});
+        return;
+      }
+
+      const permissions = {};
+      
+      // Her departman hedefi için yetki kontrolü yap
+      for (const target of targets) {
+        const [canEdit, canSubmit, canAddProgress] = await Promise.all([
+          performanceService.canUserEditDepartmentTarget(currentUserId, target.targetId),
+          performanceService.canUserSubmitDepartmentTarget(currentUserId, target.targetId),
+          performanceService.canUserAddProgressToDepartmentTarget(currentUserId, target.targetId)
+        ]);
+
+        permissions[target.targetId] = {
+          canEdit: canEdit.data,
+          canSubmit: canSubmit.data,
+          canAddProgress: canAddProgress.data
+        };
+      }
+
+      setUserPermissions(permissions);
+    } catch (error) {
+      console.error('Kullanıcı yetkileri yüklenirken hata:', error);
     }
-  }, [user, periods]);
+  }, [user]);
 
-  const loadData = async () => {
-    await Promise.all([
-      loadTargets(),
-      loadPeriods()
-    ]);
-    // Periods yüklendikten sonra authorized departments'ı yükle
-    await loadAuthorizedDepartments();
-  };
-
-  const loadTargets = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const currentUserId = user?.id; // Auth context'ten al
-      if (!currentUserId) {
-        setError('Kullanıcı bilgisi bulunamadı');
-        return;
-      }
-      
-      // Kullanıcı hedefleri ve departman hedefleri için ayrı çağrılar
-      const [userTargetsResponse, departmentTargetsResponse] = await Promise.all([
-        performanceService.getPerformanceTargets({ userId: currentUserId }),
-        performanceService.getPerformanceTargets({ departmentId: user?.departmentId })
+      // Önce temel verileri yükle
+      const [userTargetsResponse, departmentTargetsResponse, periodsResponse] = await Promise.all([
+        performanceService.getPerformanceTargets({ userId: user?.id }),
+        performanceService.getPerformanceTargets({ departmentId: user?.departmentId }),
+        performanceService.getPerformancePeriods()
       ]);
       
       const userTargets = userTargetsResponse.data.filter(target => target.assignedToUserId !== null);
       const departmentTargets = departmentTargetsResponse.data.filter(target => target.assignedToDepartmentId !== null);
       
-      // Tüm hedefleri birleştir
-      const allTargets = [...userTargets, ...departmentTargets];
-      
-      setTargets(allTargets);
       setUserTargets(userTargets);
       setDepartmentTargets(departmentTargets);
+      setPeriods(periodsResponse.data);
+      
+      // Yetkili departmanları yükle
+      if (user?.id && periodsResponse.data.length > 0) {
+        try {
+          const authorizedDeptsResponse = await performanceService.getUserAuthorizedDepartments(user.id, periodsResponse.data[0].periodId);
+          setAuthorizedDepartments(authorizedDeptsResponse.data);
+        } catch (error) {
+          console.error('Yetkili departmanlar yüklenirken hata:', error);
+        }
+      }
+      
+      // Kullanıcı yetkilerini yükle
+      if (user?.id && departmentTargets.length > 0) {
+        await loadUserPermissions(departmentTargets);
+      }
+      
     } catch (err) {
-      console.error('Hedefler yüklenirken hata:', err);
-      setError('Hedefler yüklenirken bir hata oluştu.');
+      console.error('Veriler yüklenirken hata:', err);
+      setError('Veriler yüklenirken bir hata oluştu.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, loadUserPermissions]);
 
-  const loadPeriods = async () => {
-    try {
-      const response = await performanceService.getPerformancePeriods();
-      setPeriods(response.data);
-    } catch (err) {
-      console.error('Performans dönemleri yüklenirken hata:', err);
+  useEffect(() => {
+    if (user?.id) {
+      loadData();
     }
-  };
-
-  const loadAuthorizedDepartments = async () => {
-    try {
-      const currentUserId = user?.id; // Auth context'ten al
-      if (!currentUserId) {
-        setAuthorizedDepartments([]);
-        return;
-      }
-      
-      const currentPeriodId = periods.length > 0 ? periods[0].periodId : null;
-      if (!currentPeriodId) {
-        setAuthorizedDepartments([]);
-        return;
-      }
-      
-      const response = await performanceService.getUserAuthorizedDepartments(currentUserId, currentPeriodId);
-      setAuthorizedDepartments(response.data);
-      console.log('Yetkili departmanlar:', response.data);
-    } catch (error) {
-      console.error('Yetkili departmanlar yüklenirken hata:', error);
-    }
-  };
+  }, [user?.id, loadData]);
 
   const handleCreateTarget = () => {
     setEditingTarget(null);
@@ -156,14 +152,14 @@ const MyTargetsPage = () => {
     setSelectedDepartment(null);
   };
 
-  const handleModalSuccess = () => {
-    loadTargets();
+  const handleModalSuccess = async () => {
+    await loadData();
   };
 
   const handleSubmitTarget = async (targetId) => {
     try {
       await performanceService.submitPerformanceTarget(targetId);
-      loadTargets();
+      await loadData();
     } catch (err) {
       console.error('Hedef gönderilirken hata:', err);
       setError('Hedef gönderilirken bir hata oluştu.');
@@ -413,7 +409,7 @@ const MyTargetsPage = () => {
         {departmentTargets.length > 0 && (
           <div className="targets-section">
             <h2 className="section-title">
-              <Target size={20} />
+              <Building size={20} />
               Departman Hedefleri
             </h2>
             <div className="targets-grid">
@@ -427,144 +423,16 @@ const MyTargetsPage = () => {
                       </span>
                     </div>
                     <div className="target-actions">
-                      {target.status === 1 && ( // Draft
+                      {target.status === 1 && userPermissions[target.targetId]?.canSubmit && ( // Draft
                         <button
                           onClick={() => handleSubmitTarget(target.targetId)}
-                          className="btn btn-primary btn-sm"
+                          className="btn btn-sm btn-primary"
+                          title="Onaya Gönder"
                         >
                           <Send size={16} />
-                          Onaya Gönder
                         </button>
                       )}
-                      {target.status === 3 && ( // Approved
-                        <button
-                          onClick={() => handleAddProgress(target)}
-                          className="btn btn-primary btn-sm"
-                        >
-                          <TrendingUp size={16} />
-                          İlerleme Ekle
-                        </button>
-                      )}
-                      {target.status === 7 && ( // ProgressApproved
-                        <button
-                          onClick={() => handleViewContributions(target.targetId)}
-                          className="btn btn-secondary btn-sm"
-                        >
-                          <BarChart3 size={16} />
-                          Katkı Tablosu
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="target-content">
-                    <div className="target-info">
-                      <div className="info-row">
-                        <span className="info-label">Hedef Değeri:</span>
-                        <span className="info-value">{target.targetValue} {target.unit}</span>
-                      </div>
-                      <div className="info-row">
-                        <span className="info-label">Gerçekleşme:</span>
-                        <span className="info-value">{target.actualValue || 0} {target.unit}</span>
-                      </div>
-                      <div className="info-row">
-                        <span className="info-label">Tamamlanma Oranı:</span>
-                        <span className="info-value">{formatCompletionRate(target.completionRate)}</span>
-                      </div>
-                      <div className="info-row">
-                        <span className="info-label">Ağırlık:</span>
-                        <span className="info-value">{target.weight}%</span>
-                      </div>
-                      <div className="info-row">
-                        <span className="info-label">Yön:</span>
-                        <span className={`direction-badge ${getTargetDirectionBadgeClass(target.direction)}`}>
-                          {getTargetDirectionText(target.direction)}
-                        </span>
-                      </div>
-                      {target.score && (
-                        <div className="info-row">
-                          <span className="info-label">Puan:</span>
-                          <span className="info-value">{formatScore(target.score)}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {target.description && (
-                      <div className="target-description">
-                        <p>{target.description}</p>
-                      </div>
-                    )}
-
-                    {(target.status === 3 || target.status === 5) && ( // Approved veya ProgressDraft
-                      <div className="progress-section">
-                        <div className="progress-header">
-                          <h4>İlerleme Bilgileri</h4>
-                        </div>
-                        <div className="progress-content">
-                          <div className="progress-stats">
-                            <div className="progress-stat">
-                              <span className="stat-label">Mevcut Değer:</span>
-                              <span className="stat-value">{target.actualValue || 0} {target.unit}</span>
-                            </div>
-                            <div className="progress-stat">
-                              <span className="stat-label">Tamamlanma:</span>
-                              <span className="stat-value">{formatCompletionRate(target.completionRate)}</span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleAddProgress(target)}
-                            className="btn btn-primary"
-                          >
-                            <TrendingUp size={16} />
-                            {target.status === 3 ? 'İlerleme Ekle' : 'Gerçekleşme Girişi'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="target-footer">
-                    <div className="target-meta">
-                      <span>Oluşturulma: {new Date(target.createdAt).toLocaleDateString('tr-TR')}</span>
-                      {target.updatedAt && (
-                        <span>Güncellenme: {new Date(target.updatedAt).toLocaleDateString('tr-TR')}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          )}
-
-          {/* Departman Hedefleri */}
-          {departmentTargets.length > 0 && (
-            <div className="targets-section">
-              <h2 className="section-title">
-                <Building size={20} />
-                Departman Hedefleri
-              </h2>
-              <div className="targets-grid">
-                {getFilteredTargets(departmentTargets).map((target) => (
-                  <div key={target.targetId} className="target-card">
-                    <div className="target-header">
-                      <div className="target-title">
-                        <h3>{target.targetName}</h3>
-                        <span className={`status-badge ${getTargetStatusBadgeClass(target.status)}`}>
-                          {getTargetStatusText(target.status)}
-                        </span>
-                      </div>
-                      <div className="target-actions">
-                        {target.status === 1 && ( // Draft
-                          <button
-                            onClick={() => handleSubmitTarget(target.targetId)}
-                            className="btn btn-sm btn-primary"
-                            title="Onaya Gönder"
-                          >
-                            <Send size={16} />
-                          </button>
-                        )}
-                        {target.status === 1 && ( // Draft
+                      {target.status === 1 && userPermissions[target.targetId]?.canEdit && ( // Draft
                           <button
                             onClick={() => handleEditTarget(target)}
                             className="btn btn-sm btn-secondary"
@@ -587,45 +455,53 @@ const MyTargetsPage = () => {
 
                     <div className="target-content">
                       <div className="target-info">
-                        <div className="info-row">
-                          <span className="info-label">Dönem:</span>
-                          <span className="info-value">{target.periodName}</span>
+                      <div className="info-item">
+                        <label>Dönem:</label>
+                        <span>{target.periodName}</span>
                         </div>
-                        <div className="info-row">
-                          <span className="info-label">Hedef Değeri:</span>
-                          <span className="info-value">{target.targetValue} {target.unit}</span>
+                      <div className="info-item">
+                        <label>Hedef Değeri:</label>
+                        <span>{target.targetValue} {target.unit}</span>
                         </div>
-                        <div className="info-row">
-                          <span className="info-label">Ağırlık:</span>
-                          <span className="info-value">%{target.weight}</span>
+                      <div className="info-item">
+                        <label>Ağırlık:</label>
+                        <span>{target.weight}%</span>
                         </div>
-                        <div className="info-row">
-                          <span className="info-label">Yön:</span>
+                      <div className="info-item">
+                        <label>Yön:</label>
                           <span className={`direction-badge ${getTargetDirectionBadgeClass(target.direction)}`}>
                             {getTargetDirectionText(target.direction)}
                           </span>
                         </div>
                         {target.actualValue !== null && (
-                          <div className="info-row">
-                            <span className="info-label">Gerçekleşen:</span>
-                            <span className="info-value">{target.actualValue} {target.unit}</span>
+                        <div className="info-item">
+                          <label>Gerçekleşen:</label>
+                          <span>{target.actualValue} {target.unit}</span>
                           </div>
                         )}
                         {target.completionRate !== null && (
-                          <div className="info-row">
-                            <span className="info-label">Gerçekleşme Oranı:</span>
-                            <span className="info-value">{formatCompletionRate(target.completionRate)}</span>
+                        <div className="info-item">
+                          <label>Gerçekleşme Oranı:</label>
+                          <span className={`completion-rate ${target.completionRate >= 100 ? 'success' : target.completionRate >= 80 ? 'warning' : 'danger'}`}>
+                            {formatCompletionRate(target.completionRate)}
+                          </span>
                           </div>
                         )}
                         {target.score && (
-                          <div className="info-row">
-                            <span className="info-label">Puan:</span>
-                            <span className="info-value">{formatScore(target.score)}</span>
+                        <div className="info-item">
+                          <label>Puan:</label>
+                          <span className="score">{formatScore(target.score)}</span>
+                        </div>
+                      )}
+                      {target.letterGrade && (
+                        <div className="info-item">
+                          <label>Harf Notu:</label>
+                          <span className="letter-grade">{target.letterGrade}</span>
                           </div>
                         )}
                       </div>
 
-                      {(target.status === 3 || target.status === 5) && ( // Approved veya ProgressDraft
+                      {(target.status === 3 || target.status === 5) && userPermissions[target.targetId]?.canAddProgress && ( // Approved veya ProgressDraft
                         <div className="target-actions-section">
                           <button
                             onClick={() => handleAddProgress(target)}

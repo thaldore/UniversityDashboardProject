@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }) => {
           // Token'ın geçerliliğini kontrol et
           try {
             // Basit bir API çağrısı yap token'ı test etmek için
-            await authService.getProfile(parsedUser.id);
+            await authService.getProfile();
           } catch (tokenError) {
             console.log('Token validation failed, clearing auth data:', tokenError.message);
             // Token geçersiz, temizle
