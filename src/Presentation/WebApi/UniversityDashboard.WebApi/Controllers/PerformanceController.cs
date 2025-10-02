@@ -7,6 +7,7 @@ using UniversityDashBoardProject.Application.Features.Performance.Queries;
 using UniversityDashBoardProject.Application.Interfaces;
 using UniversityDashBoardProject.Application.DTOs.Indicator;
 using System.Security.Claims;
+using Serilog;
 
 namespace UniversityDashBoardProject.WebApi.Controllers
 {
@@ -17,6 +18,7 @@ namespace UniversityDashBoardProject.WebApi.Controllers
     {
         private readonly IMediator _mediator;
         private readonly IPerformanceService _performanceService;
+        private readonly Serilog.ILogger _logger = Log.ForContext<PerformanceController>();
 
         public PerformanceController(IMediator mediator, IPerformanceService performanceService)
         {
@@ -29,13 +31,17 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         [HttpGet("periods")]
         public async Task<ActionResult<List<PerformancePeriodListDto>>> GetPerformancePeriods()
         {
+            _logger.Information("Getting performance periods by user: {UserId}", GetCurrentUserId());
+            
             try
             {
                 var result = await _mediator.Send(new GetPerformancePeriodsQuery());
+                _logger.Information("Performance periods retrieved successfully, count: {Count}", result.Count);
                 return Ok(result);
             }
             catch (Exception ex)
             {
+                _logger.Error(ex, "Error getting performance periods");
                 return StatusCode(500, new { message = "Performans dönemleri getirilirken hata oluştu.", error = ex.Message });
             }
         }
@@ -61,6 +67,8 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<int>> CreatePerformancePeriod([FromBody] CreatePerformancePeriodRequest request)
         {
+            _logger.Information("Creating performance period: {PeriodName} by user: {UserId}", request.PeriodName, GetCurrentUserId());
+            
             try
             {
                 var userId = GetCurrentUserId();
@@ -69,10 +77,12 @@ namespace UniversityDashBoardProject.WebApi.Controllers
                     Request = request, 
                     CreatedBy = userId 
                 });
+                _logger.Information("Performance period created successfully with ID: {PeriodId}", result);
                 return CreatedAtAction(nameof(GetPerformancePeriod), new { id = result }, result);
             }
             catch (Exception ex)
             {
+                _logger.Error(ex, "Error creating performance period: {PeriodName}", request.PeriodName);
                 return StatusCode(500, new { message = "Performans dönemi oluşturulurken hata oluştu.", error = ex.Message });
             }
         }

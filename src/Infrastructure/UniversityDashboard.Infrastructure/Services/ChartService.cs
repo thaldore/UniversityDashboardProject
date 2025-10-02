@@ -5,12 +5,14 @@ using UniversityDashBoardProject.Application.Interfaces;
 using UniversityDashBoardProject.Domain.Entities;
 using UniversityDashBoardProject.Domain.Enums;
 using UniversityDashBoardProject.Infrastructure.Persistence;
+using Serilog;
 
 namespace UniversityDashBoardProject.Infrastructure.Services
 {
     public class ChartService : IChartService
     {
         private readonly ApplicationDbContext _context;
+        private readonly Serilog.ILogger _logger = Log.ForContext<ChartService>();
 
         public ChartService(ApplicationDbContext context)
         {
@@ -21,6 +23,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
         public async Task<List<ChartSectionTreeDto>> GetChartSectionsAsync()
         {
+            _logger.Information("Getting chart sections");
+            
             // First, get all active sections with their navigation properties
             var allSections = await _context.ChartSections
                 .Where(s => s.IsActive)
@@ -222,6 +226,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
         public async Task<int> CreateChartAsync(CreateChartRequest request, int createdBy)
         {
+            _logger.Information("Creating chart: {ChartName} by user: {CreatedBy}", request.ChartName, createdBy);
+            
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
@@ -320,10 +326,12 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
+                _logger.Information("Chart created successfully with ID: {ChartId}", chart.ChartId);
                 return chart.ChartId;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.Error(ex, "Error creating chart: {ChartName}", request.ChartName);
                 await transaction.RollbackAsync();
                 throw;
             }

@@ -4,6 +4,7 @@ using UniversityDashBoardProject.Application.Interfaces;
 using UniversityDashBoardProject.Domain.Entities;
 using UniversityDashBoardProject.Infrastructure.Persistence;
 using UniversityDashBoardProject.Domain.Services;
+using Serilog;
 
 namespace UniversityDashBoardProject.Infrastructure.Services
 {
@@ -11,6 +12,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly IPeriodCalculationService _periodCalculationService;
+        private readonly Serilog.ILogger _logger = Log.ForContext<IndicatorService>();
 
         public IndicatorService(ApplicationDbContext context, IPeriodCalculationService periodCalculationService)
         {
@@ -20,6 +22,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
         public async Task<int> CreateIndicatorAsync(CreateIndicatorRequest request, int createdBy)
         {
+            _logger.Information("Creating indicator: {IndicatorName} by user: {CreatedBy}", request.IndicatorName, createdBy);
+            
             var indicator = new Indicator
             {
                 IndicatorCode = request.IndicatorCode,

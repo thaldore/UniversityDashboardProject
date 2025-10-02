@@ -1,12 +1,17 @@
 using UniversityDashBoardProject.Domain.Enums;
 using UniversityDashBoardProject.Domain.Services;
+using Serilog;
 
 namespace UniversityDashBoardProject.Infrastructure.Services
 {
     public class PeriodCalculationService : IPeriodCalculationService
     {
+        private readonly Serilog.ILogger _logger = Log.ForContext<PeriodCalculationService>();
         public (int year, int period) GetNextDataEntryPeriod(DateTime periodStartDate, PeriodType periodType, int currentYear, int currentPeriod)
         {
+            _logger.Debug("Calculating next data entry period for PeriodType: {PeriodType}, CurrentYear: {CurrentYear}, CurrentPeriod: {CurrentPeriod}", 
+                periodType, currentYear, currentPeriod);
+            
             var periodsPerYear = GetPeriodsPerYear(periodType);
             var startYear = periodStartDate.Year;
             var startPeriod = GetPeriodFromDateTime(periodStartDate, periodType);
@@ -21,11 +26,15 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             var nextYear = startYear + (startPeriod - 1 + nextDataEntryPeriodIndex) / periodsPerYear;
             var nextPeriod = ((startPeriod - 1 + nextDataEntryPeriodIndex) % periodsPerYear) + 1;
             
+            _logger.Debug("Next data entry period calculated: Year: {NextYear}, Period: {NextPeriod}", nextYear, nextPeriod);
             return (nextYear, nextPeriod);
         }
         
         public bool IsDataEntryAllowed(DateTime periodStartDate, PeriodType periodType, int targetYear, int targetPeriod)
         {
+            _logger.Debug("Checking if data entry is allowed for PeriodType: {PeriodType}, TargetYear: {TargetYear}, TargetPeriod: {TargetPeriod}", 
+                periodType, targetYear, targetPeriod);
+            
             var startYear = periodStartDate.Year;
             var startPeriod = GetPeriodFromDateTime(periodStartDate, periodType);
             var periodsPerYear = GetPeriodsPerYear(periodType);
@@ -33,13 +42,19 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             // Başlangıç periyodundan itibaren kaç periyot geçtiğini hesapla
             var totalPeriodsPassed = (targetYear - startYear) * periodsPerYear + (targetPeriod - startPeriod);
             
-            if (totalPeriodsPassed < 0) return false;
+            if (totalPeriodsPassed < 0) 
+            {
+                _logger.Debug("Data entry not allowed: Target period is before start period");
+                return false;
+            }
             
             // Veri giriş aralığını al
             var dataEntryInterval = GetDataEntryInterval(periodType);
             
             // Bu periyotta veri girişi yapılabilir mi kontrol et
-            return totalPeriodsPassed % dataEntryInterval == 0;
+            var isAllowed = totalPeriodsPassed % dataEntryInterval == 0;
+            _logger.Debug("Data entry allowed: {IsAllowed} for PeriodType: {PeriodType}", isAllowed, periodType);
+            return isAllowed;
         }
         
         public int GetPeriodsPerYear(PeriodType periodType)

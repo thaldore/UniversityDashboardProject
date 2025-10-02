@@ -7,6 +7,7 @@ using UniversityDashBoardProject.Application.Features.Charts.Queries;
 using UniversityDashBoardProject.Application.Features.Indicators.Queries;
 using UniversityDashBoardProject.Application.Interfaces;
 using System.Security.Claims;
+using Serilog;
 
 namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
 {
@@ -17,6 +18,7 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
     {
         private readonly IMediator _mediator;
         private readonly IChartService _chartService;
+        private readonly Serilog.ILogger _logger = Log.ForContext<ChartController>();
 
         public ChartController(IMediator mediator, IChartService chartService)
         {
@@ -161,6 +163,8 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<int>> CreateChart([FromBody] CreateChartRequest request)
         {
+            _logger.Information("Creating chart: {ChartName} in section: {SectionId}", request.ChartName, request.SectionId);
+            
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
             
             var command = new CreateChartCommand
@@ -182,8 +186,17 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
                 Groups = request.Groups
             };
 
-            var result = await _mediator.Send(command);
-            return CreatedAtAction(nameof(GetChartById), new { id = result }, result);
+            try
+            {
+                var result = await _mediator.Send(command);
+                _logger.Information("Chart created successfully with ID: {ChartId}", result);
+                return CreatedAtAction(nameof(GetChartById), new { id = result }, result);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error creating chart: {ChartName}", request.ChartName);
+                return StatusCode(500, new { message = "Failed to create chart", error = ex.Message });
+            }
         }
 
         /// <summary>

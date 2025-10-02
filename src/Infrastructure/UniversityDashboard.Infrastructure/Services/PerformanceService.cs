@@ -5,12 +5,14 @@ using UniversityDashBoardProject.Application.Interfaces;
 using UniversityDashBoardProject.Domain.Entities;
 using UniversityDashBoardProject.Domain.Enums;
 using UniversityDashBoardProject.Infrastructure.Persistence;
+using Serilog;
 
 namespace UniversityDashBoardProject.Infrastructure.Services
 {
     public class PerformanceService : IPerformanceService
     {
         private readonly ApplicationDbContext _context;
+        private readonly Serilog.ILogger _logger = Log.ForContext<PerformanceService>();
 
         public PerformanceService(ApplicationDbContext context)
         {

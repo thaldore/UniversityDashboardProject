@@ -15,7 +15,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ITokenService _tokenService;
-        private readonly ILogger _logger = Log.ForContext<AuthService>();
+        private readonly Serilog.ILogger _logger = Log.ForContext<AuthService>();
         private readonly IConfiguration _configuration;
         private readonly ApplicationDbContext _context;
 

@@ -6,6 +6,7 @@ using UniversityDashBoardProject.Application.Features.Indicators.Commands;
 using UniversityDashBoardProject.Application.Features.Indicators.Queries;
 using UniversityDashBoardProject.Domain.Services;
 using System.Security.Claims;
+using Serilog;
 
 namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
 {
@@ -16,6 +17,7 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
     {
         private readonly IMediator _mediator;
         private readonly IPeriodCalculationService _periodCalculationService;
+        private readonly Serilog.ILogger _logger = Log.ForContext<IndicatorController>();
 
         public IndicatorController(IMediator mediator, IPeriodCalculationService periodCalculationService)
         {
@@ -30,6 +32,8 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateIndicator([FromBody] CreateIndicatorRequest request)
         {
+            _logger.Information("Creating indicator: {IndicatorName} by user: {UserId}", request.IndicatorName, GetCurrentUserId());
+            
             try
             {
                 var userId = GetCurrentUserId();
@@ -39,10 +43,12 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
                     CreatedBy = userId
                 };
                 var result = await _mediator.Send(command);
+                _logger.Information("Indicator created successfully with ID: {IndicatorId}", result);
                 return Ok(new { IndicatorId = result, Message = "Gösterge başarıyla oluşturuldu." });
             }
             catch (Exception ex)
             {
+                _logger.Error(ex, "Error creating indicator: {IndicatorName}", request.IndicatorName);
                 return BadRequest(new { Message = "Gösterge oluşturulurken hata oluştu.", Error = ex.Message });
             }
         }
@@ -54,14 +60,18 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetIndicatorList()
         {
+            _logger.Information("Getting indicator list by user: {UserId}", GetCurrentUserId());
+            
             try
             {
                 var query = new GetIndicatorListQuery();
                 var result = await _mediator.Send(query);
+                _logger.Information("Indicator list retrieved successfully, count: {Count}", result.Count);
                 return Ok(result);
             }
             catch (Exception ex)
             {
+                _logger.Error(ex, "Error getting indicator list");
                 return BadRequest(new { Message = "Göstergeler listelenirken hata oluştu.", Error = ex.Message });
             }
         }
