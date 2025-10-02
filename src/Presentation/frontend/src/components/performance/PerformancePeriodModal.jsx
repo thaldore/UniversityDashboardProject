@@ -555,6 +555,16 @@ const PerformancePeriodModal = ({ isOpen, onClose, onSuccess, period = null, isE
             {/* Puanlama Sistemi */}
             <div className="form-section">
               <h3>Puanlama Sistemi</h3>
+              <div className="scoring-info">
+                <p>
+                  <strong>Puanlama Sistemi Açıklaması:</strong>
+                </p>
+                <ul>
+                  <li><strong>Pozitif Hedefler:</strong> Gerçekleşme oranı = (Gerçekleşen / Hedef) × 100</li>
+                  <li><strong>Negatif Hedefler:</strong> Gerçekleşme oranı = ((Hedef - Gerçekleşen) / Hedef) × 100</li>
+                  <li>Örnek: Hedef 100'den 20'ye düşürmek = %80 başarı</li>
+                </ul>
+              </div>
               <div className="scoring-section">
                 {formData.scorings.map((scoring, index) => (
                   <div key={index} className="scoring-item">

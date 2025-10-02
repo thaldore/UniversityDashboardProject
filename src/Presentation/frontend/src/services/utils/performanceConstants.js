@@ -218,9 +218,17 @@ export const validatePerformanceScoring = (scoring) => {
   return errors;
 };
 
-export const calculateCompletionRate = (actualValue, targetValue) => {
+export const calculateCompletionRate = (actualValue, targetValue, direction = 'positive') => {
   if (!targetValue || targetValue === 0) return 0;
-  return (actualValue / targetValue) * 100;
+  
+  if (direction === 'positive' || direction === 1) {
+    // Pozitif hedefler için: (actual / target) * 100
+    return (actualValue / targetValue) * 100;
+  } else {
+    // Negatif hedefler için: (target - actual) / target * 100
+    // Örnek: Hedef 100'den 20'ye düşürmek, 80% başarı = (100-20)/100 * 100 = 80%
+    return ((targetValue - actualValue) / targetValue) * 100;
+  }
 };
 
 export const calculateScore = (completionRate, scorings, isNegativeTarget = false) => {

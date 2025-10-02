@@ -76,8 +76,11 @@ namespace UniversityDashBoardProject.Application.DTOs.Performance
     {
         public int TargetId { get; set; }
         public string TargetName { get; set; } = string.Empty;
+        public int PeriodId { get; set; }
         public string PeriodName { get; set; } = string.Empty;
+        public int? DepartmentId { get; set; }
         public string? DepartmentName { get; set; }
+        public int? UserId { get; set; }
         public string? UserName { get; set; }
         public decimal TargetValue { get; set; }
         public decimal? ActualValue { get; set; }

@@ -252,8 +252,11 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 {
                     TargetId = t.TargetId,
                     TargetName = t.TargetName,
+                    PeriodId = t.PeriodId,
                     PeriodName = t.Period.PeriodName,
+                    DepartmentId = t.DepartmentId,
                     DepartmentName = t.Department != null ? t.Department.DepartmentName : null,
+                    UserId = t.UserId,
                     UserName = t.User != null ? $"{t.User.FirstName} {t.User.LastName}" : null,
                     TargetValue = t.TargetValue,
                     ActualValue = t.Progresses.Where(p => p.Status == ProgressStatus.Approved || p.Status == ProgressStatus.Draft).Sum(p => p.ProgressValue),
@@ -266,25 +269,26 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                         ? (t.Progresses.Where(p => p.Status == ProgressStatus.Approved || p.Status == ProgressStatus.Draft).Sum(p => p.ProgressValue) / t.TargetValue) * 100 
                         : null,
                     ProgressId = t.Progresses.Where(p => p.Status == ProgressStatus.Draft).OrderByDescending(p => p.CreatedAt).Select(p => p.ProgressId).FirstOrDefault(),
-                    Score = t.ActualValue.HasValue && t.TargetValue > 0 ? 
-                        _context.PerformanceScorings
-                            .Where(s => s.PeriodId == t.PeriodId)
-                            .Where(s => s.IsForNegativeTarget == (t.Direction == TargetDirection.Negative))
-                            .Where(s => ((t.ActualValue.Value / t.TargetValue) * 100) >= s.MinValue && (s.MaxValue == null || ((t.ActualValue.Value / t.TargetValue) * 100) <= s.MaxValue))
-                            .OrderBy(s => s.DisplayOrder)
-                            .Select(s => s.Score)
-                            .FirstOrDefault() : null,
-                    LetterGrade = t.ActualValue.HasValue && t.TargetValue > 0 ? 
-                        _context.PerformanceScorings
-                            .Where(s => s.PeriodId == t.PeriodId)
-                            .Where(s => s.IsForNegativeTarget == (t.Direction == TargetDirection.Negative))
-                            .Where(s => ((t.ActualValue.Value / t.TargetValue) * 100) >= s.MinValue && (s.MaxValue == null || ((t.ActualValue.Value / t.TargetValue) * 100) <= s.MaxValue))
-                            .OrderBy(s => s.DisplayOrder)
-                            .Select(s => s.LetterGrade)
-                            .FirstOrDefault() : null
+                    Score = null, // Bu değerler sonradan hesaplanacak
+                    LetterGrade = null // Bu değerler sonradan hesaplanacak
                 })
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
+
+            // Puanlama hesaplamalarını sonradan yap
+            foreach (var target in targets)
+            {
+                if (target.ActualValue.HasValue && target.TargetValue > 0)
+                {
+                    var score = await CalculateTargetScoreAsync(target.TargetId, target.ActualValue.Value);
+                    target.Score = score;
+                    
+                    if (score > 0)
+                    {
+                        target.LetterGrade = await GetLetterGradeAsync(target.PeriodId, score, (TargetDirection)target.Direction);
+                    }
+                }
+            }
 
             return targets;
         }
@@ -303,7 +307,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             if (target == null) return null;
 
             var completionRate = target.ActualValue.HasValue && target.TargetValue > 0 
-                ? (target.ActualValue.Value / target.TargetValue) * 100 
+                ? CalculateCompletionRate(target.TargetValue, target.ActualValue.Value, target.Direction)
                 : (decimal?)null;
 
             var score = await CalculateTargetScoreAsync(targetId, target.ActualValue ?? 0);
@@ -618,7 +622,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 progress.Target.Status = TargetStatus.ProgressApproved;
                 progress.Target.UpdatedAt = DateTime.UtcNow;
                 
-                // Hedef tamamlandığında scoring hesapla
+                // Hedef tamamlandığında scoring hesapla (bu metod actual value'yi de güncelleyecek)
                 await CalculateTargetScoreAsync(progress.Target.TargetId);
             }
             else
@@ -866,7 +870,8 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
             if (target == null) return 0;
 
-            var completionRate = target.TargetValue > 0 ? (actualValue / target.TargetValue) * 100 : 0;
+            // Gerçekleşme oranını hesapla
+            var completionRate = CalculateCompletionRate(target.TargetValue, actualValue, target.Direction);
 
             var scoring = await _context.PerformanceScorings
                 .Where(s => s.PeriodId == target.PeriodId && s.IsForNegativeTarget == (target.Direction == TargetDirection.Negative))
@@ -1074,7 +1079,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             if (actualValue <= 0) return (null, null);
 
             // Tamamlanma oranını hesapla
-            var completionRate = (actualValue / target.TargetValue) * 100;
+            var completionRate = CalculateCompletionRate(target.TargetValue, actualValue, target.Direction);
 
             // Scoring tablosundan uygun puanı bul
             var scoring = await _context.PerformanceScorings
@@ -1084,22 +1089,40 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 .OrderBy(s => s.DisplayOrder)
                 .FirstOrDefaultAsync();
 
+            // Hedefin actual value'sunu her zaman güncelle
+            target.ActualValue = actualValue;
+            target.UpdatedAt = DateTime.UtcNow;
+
             if (scoring != null)
             {
-                // Hedefin actual value'sunu güncelle
-                target.ActualValue = actualValue;
-                target.UpdatedAt = DateTime.UtcNow;
-
                 await _context.SaveChangesAsync();
                 return (scoring.Score, scoring.LetterGrade);
             }
 
+            await _context.SaveChangesAsync();
             return (null, null);
         }
 
         #endregion
 
         #region Helper Methods
+
+        private decimal CalculateCompletionRate(decimal targetValue, decimal actualValue, TargetDirection direction)
+        {
+            if (targetValue <= 0) return 0;
+
+            if (direction == TargetDirection.Positive)
+            {
+                // Pozitif hedefler için: (actual / target) * 100
+                return (actualValue / targetValue) * 100;
+            }
+            else
+            {
+                // Negatif hedefler için: (target - actual) / target * 100
+                // Örnek: Hedef 100'den 20'ye düşürmek, 80% başarı = (100-20)/100 * 100 = 80%
+                return ((targetValue - actualValue) / targetValue) * 100;
+            }
+        }
 
         private string GetTargetStatusText(TargetStatus status)
         {

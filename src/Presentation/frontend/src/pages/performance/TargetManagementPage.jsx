@@ -8,9 +8,7 @@ import {
   getTargetStatusText, 
   getTargetStatusBadgeClass, 
   formatCompletionRate, 
-  formatScore,
-  getTargetDirectionText,
-  getTargetDirectionBadgeClass
+  formatScore
 } from '../../services/utils/performanceConstants';
 
 const TargetManagementPage = () => {
@@ -25,7 +23,11 @@ const TargetManagementPage = () => {
   const [selectedTarget, setSelectedTarget] = useState(null);
   const [filter, setFilter] = useState('all'); // all, pending, approved, completed
   const [periodFilter, setPeriodFilter] = useState('all'); // all, periodId
+  const [departmentFilter, setDepartmentFilter] = useState('all'); // all, departmentId
+  const [userFilter, setUserFilter] = useState('all'); // all, userId
   const [searchTerm, setSearchTerm] = useState('');
+  const [departments, setDepartments] = useState([]);
+  const [users, setUsers] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -36,13 +38,17 @@ const TargetManagementPage = () => {
     setError(null);
     
     try {
-      const [targetsResponse, periodsResponse] = await Promise.all([
+      const [targetsResponse, periodsResponse, departmentsResponse, usersResponse] = await Promise.all([
         performanceService.getPerformanceTargets(),
-        performanceService.getPerformancePeriods()
+        performanceService.getPerformancePeriods(),
+        performanceService.getAvailableDepartments(),
+        performanceService.getAvailableUsers()
       ]);
       
       setTargets(targetsResponse.data);
       setPeriods(periodsResponse.data);
+      setDepartments(departmentsResponse.data);
+      setUsers(usersResponse.data);
     } catch (err) {
       console.error('Veriler yüklenirken hata:', err);
       setError('Veriler yüklenirken bir hata oluştu.');
@@ -132,8 +138,10 @@ const TargetManagementPage = () => {
       target.periodName.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesPeriod = periodFilter === 'all' || target.periodId === parseInt(periodFilter);
+    const matchesDepartment = departmentFilter === 'all' || target.departmentId === parseInt(departmentFilter);
+    const matchesUser = userFilter === 'all' || target.userId === parseInt(userFilter);
     
-    return matchesFilter && matchesSearch && matchesPeriod;
+    return matchesFilter && matchesSearch && matchesPeriod && matchesDepartment && matchesUser;
   });
 
   if (loading) {
@@ -211,21 +219,55 @@ const TargetManagementPage = () => {
           </button>
         </div>
         
-        <div className="period-filter">
-          <label className="filter-label">Performans Dönemi:</label>
-          <select
-            value={periodFilter}
-            onChange={(e) => setPeriodFilter(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">Tüm Performans Dönemleri</option>
-            {periods.map(period => (
-              <option key={period.periodId} value={period.periodId}>
-                {period.periodName}
-              </option>
-            ))}
-          </select>
-        </div>
+         <div className="advanced-filters">
+           <div className="filter-group">
+             <label className="filter-label">Performans Dönemi:</label>
+             <select
+               value={periodFilter}
+               onChange={(e) => setPeriodFilter(e.target.value)}
+               className="filter-select"
+             >
+               <option value="all">Tüm Performans Dönemleri</option>
+               {periods.map(period => (
+                 <option key={period.periodId} value={period.periodId}>
+                   {period.periodName}
+                 </option>
+               ))}
+             </select>
+           </div>
+
+           <div className="filter-group">
+             <label className="filter-label">Departman:</label>
+             <select
+               value={departmentFilter}
+               onChange={(e) => setDepartmentFilter(e.target.value)}
+               className="filter-select"
+             >
+               <option value="all">Tüm Departmanlar</option>
+               {departments.map(dept => (
+                 <option key={dept.departmentId} value={dept.departmentId}>
+                   {dept.departmentName}
+                 </option>
+               ))}
+             </select>
+           </div>
+
+           <div className="filter-group">
+             <label className="filter-label">Kullanıcı:</label>
+             <select
+               value={userFilter}
+               onChange={(e) => setUserFilter(e.target.value)}
+               className="filter-select"
+             >
+               <option value="all">Tüm Kullanıcılar</option>
+               {users.map(user => (
+                 <option key={user.id} value={user.id}>
+                   {user.firstName} {user.lastName} ({user.email})
+                 </option>
+               ))}
+             </select>
+           </div>
+         </div>
       </div>
 
       <div className="targets-container">
@@ -260,13 +302,13 @@ const TargetManagementPage = () => {
                     <td className="assigned-to">
                       {target.departmentName && (
                         <div className="assigned-item">
-                          <Building size={14} />
+                          <Building size={16} />
                           <span>{target.departmentName}</span>
                         </div>
                       )}
                       {target.userName && (
                         <div className="assigned-item">
-                          <Users size={14} />
+                          <Users size={16} />
                           <span>{target.userName}</span>
                         </div>
                       )}
@@ -283,16 +325,26 @@ const TargetManagementPage = () => {
                     <td className="progress-info">
                       {target.actualValue !== null ? (
                         <div className="progress-details">
-                          <div className="actual-value">
-                            {target.actualValue} {target.unit}
+                          <div className="progress-item">
+                            <label>Gerçekleşen:</label>
+                            <span>{target.actualValue} {target.unit}</span>
                           </div>
-                          <div className={`completion-rate ${target.completionRate >= 100 ? 'success' : target.completionRate >= 80 ? 'warning' : 'danger'}`}>
-                            {formatCompletionRate(target.completionRate)}
+                          <div className="progress-item">
+                            <label>Gerçekleşme Oranı:</label>
+                            <span className={`completion-rate ${target.completionRate >= 100 ? 'success' : target.completionRate >= 80 ? 'warning' : 'danger'}`}>
+                              {formatCompletionRate(target.completionRate)}
+                            </span>
                           </div>
                           {target.score && (
-                            <div className="score-info">
-                              Puan: {formatScore(target.score)}
-                              {target.letterGrade && ` (${target.letterGrade})`}
+                            <div className="progress-item">
+                              <label>Puan:</label>
+                              <span className="score">{formatScore(target.score)}</span>
+                            </div>
+                          )}
+                          {target.letterGrade && (
+                            <div className="progress-item">
+                              <label>Harf Notu:</label>
+                              <span className="letter-grade">{target.letterGrade}</span>
                             </div>
                           )}
                         </div>
@@ -307,13 +359,16 @@ const TargetManagementPage = () => {
                     </td>
                     <td className="actions">
                       <div className="action-buttons">
-                        <button
-                          onClick={() => handleEditTarget(target)}
-                          className="btn btn-sm btn-secondary"
-                          title="Düzenle"
-                        >
-                          <Edit size={16} />
-                        </button>
+                        {/* Düzenleme butonu - Draft, Rejected ve ProgressRejected durumlarında göster */}
+                        {(target.status === 1 || target.status === 4 || target.status === 8) && (
+                          <button
+                            onClick={() => handleEditTarget(target)}
+                            className="btn btn-sm btn-secondary"
+                            title="Düzenle"
+                          >
+                            <Edit size={16} />
+                          </button>
+                        )}
                         
                         {target.status === 2 && ( // Submitted
                           <>
