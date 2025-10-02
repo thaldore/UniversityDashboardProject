@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Target, Plus, Users, Building, Edit, Trash2, CheckCircle, XCircle, BarChart3, AlertCircle, Grid, List } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import performanceService from '../../services/api/performanceService';
 import PerformanceTargetModal from '../../components/performance/PerformanceTargetModal';
 import PerformanceTargetAssignModal from '../../components/performance/PerformanceTargetAssignModal';
@@ -13,6 +14,7 @@ import {
 } from '../../services/utils/performanceConstants';
 
 const TargetManagementPage = () => {
+  const { user } = useAuth();
   const [targets, setTargets] = useState([]);
   const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,9 +33,17 @@ const TargetManagementPage = () => {
   const [users, setUsers] = useState([]);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
 
+  // Rol kontrolü - sadece Admin erişebilir
+  const isAdmin = user?.roles?.includes('Admin');
+
   useEffect(() => {
-    loadData();
-  }, []);
+    // Sadece Admin ise veri yükle
+    if (isAdmin) {
+      loadData();
+    } else {
+      setLoading(false);
+    }
+  }, [isAdmin]);
 
   const loadData = async () => {
     setLoading(true);
@@ -178,6 +188,20 @@ const TargetManagementPage = () => {
     
     return matchesFilter && matchesSearch && matchesPeriod && matchesDepartment && matchesUser;
   });
+
+  // Admin değilse erişim reddedildi mesajı göster
+  if (!isAdmin) {
+    return (
+      <div className="access-denied">
+        <div className="access-denied-content">
+          <AlertCircle size={48} />
+          <h2>Erişim Reddedildi</h2>
+          <p>Bu sayfaya erişim yetkiniz bulunmamaktadır.</p>
+          <p>Sadece Admin kullanıcıları hedef yönetimi sayfasına erişebilir.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

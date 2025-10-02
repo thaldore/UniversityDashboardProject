@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Calendar, Users, Target, Settings, Eye, Edit, Trash2, ToggleLeft, ToggleRight, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import performanceService from '../../services/api/performanceService';
 import PerformancePeriodModal from '../../components/performance/PerformancePeriodModal';
 import { formatDate, getPerformancePeriodStatus, getPerformancePeriodStatusText, getPerformancePeriodStatusBadgeClass } from '../../services/utils/performanceConstants';
 
 const PerformanceListPage = () => {
+  const { user } = useAuth();
   const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editingPeriod, setEditingPeriod] = useState(null);
   const [isEdit, setIsEdit] = useState(false);
+
+  // Rol kontrolü
+  const isAdmin = user?.roles?.includes('Admin');
+  const canCreatePeriod = isAdmin;
 
   useEffect(() => {
     loadPeriods();
@@ -95,13 +101,15 @@ const PerformanceListPage = () => {
           <p>Performans dönemlerini yönetin ve yeni dönemler oluşturun</p>
         </div>
         <div className="header-actions">
-          <button
-            onClick={handleCreatePeriod}
-            className="btn btn-primary"
-          >
-            <Plus size={20} />
-            Yeni Performans Dönemi
-          </button>
+          {canCreatePeriod && (
+            <button
+              onClick={handleCreatePeriod}
+              className="btn btn-primary"
+            >
+              <Plus size={20} />
+              Yeni Performans Dönemi
+            </button>
+          )}
         </div>
       </div>
 
@@ -130,27 +138,31 @@ const PerformanceListPage = () => {
                       </span>
                     </div>
                     <div className="period-actions">
-                      <button
-                        onClick={() => handleToggleStatus(period.periodId, period.isActive)}
-                        className={`btn btn-sm ${period.isActive ? 'btn-success' : 'btn-secondary'}`}
-                        title={period.isActive ? 'Pasifleştir' : 'Aktifleştir'}
-                      >
-                        {period.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                      </button>
-                      <button
-                        onClick={() => handleEditPeriod(period)}
-                        className="btn btn-sm btn-primary"
-                        title="Düzenle"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeletePeriod(period.periodId)}
-                        className="btn btn-sm btn-danger"
-                        title="Sil"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {isAdmin && (
+                        <>
+                          <button
+                            onClick={() => handleToggleStatus(period.periodId, period.isActive)}
+                            className={`btn btn-sm ${period.isActive ? 'btn-success' : 'btn-secondary'}`}
+                            title={period.isActive ? 'Pasifleştir' : 'Aktifleştir'}
+                          >
+                            {period.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                          </button>
+                          <button
+                            onClick={() => handleEditPeriod(period)}
+                            className="btn btn-sm btn-primary"
+                            title="Düzenle"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePeriod(period.periodId)}
+                            className="btn btn-sm btn-danger"
+                            title="Sil"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -210,13 +222,15 @@ const PerformanceListPage = () => {
             <Calendar size={48} />
             <h3>Performans Dönemi Bulunamadı</h3>
             <p>Henüz hiç performans dönemi oluşturulmamış.</p>
-            <button
-              onClick={handleCreatePeriod}
-              className="btn btn-primary"
-            >
-              <Plus size={20} />
-              İlk Performans Dönemini Oluştur
-            </button>
+            {canCreatePeriod && (
+              <button
+                onClick={handleCreatePeriod}
+                className="btn btn-primary"
+              >
+                <Plus size={20} />
+                İlk Performans Dönemini Oluştur
+              </button>
+            )}
           </div>
         )}
       </div>

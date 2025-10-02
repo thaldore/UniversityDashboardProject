@@ -1,66 +1,91 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const Sidebar = () => {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const { user } = useAuth();
 
-  const menuItems = [
-    { 
-      path: '/', 
-      label: 'Ana Sayfa', 
-      icon: '🏠',
-      description: 'Ana sayfa'
-    },
-    { 
-      path: '/charts', 
-      label: 'Grafikler', 
-      icon: '📈',
-      description: 'Grafik yönetimi ve görüntüleme'
-    },
-    { 
-      path: '/indicators', 
-      label: 'Gösterge Listesi', 
-      icon: '📊',
-      description: 'Gösterge yönetimi'
-    },
-    { 
-      path: '/indicators/new', 
-      label: 'Yeni Gösterge', 
-      icon: '➕',
-      description: 'Yeni gösterge oluştur'
-    },
-    { 
-      path: '/indicators/data-entry', 
-      label: 'Veri Girişi', 
-      icon: '📝',
-      description: 'Gösterge verilerini gir'
-    },
-    { 
-      path: '/performance', 
-      label: 'Performans Dönemleri', 
-      icon: '📅',
-      description: 'Performans dönemlerini yönet'
-    },
-    { 
-      path: '/performance/my-targets', 
-      label: 'Hedeflerim', 
-      icon: '🎯',
-      description: 'Size atanan hedefler'
-    },
-    { 
-      path: '/performance/target-management', 
-      label: 'Hedef Yönetimi', 
-      icon: '⚙️',
-      description: 'Hedefleri yönet ve onayla'
-    },
-    { 
-      path: '/auth/profile', 
-      label: 'Profil', 
-      icon: '👤',
-      description: 'Profil bilgileri'
-    }
-  ];
+  // Rol kontrolü için yardımcı fonksiyon
+  const hasRole = (requiredRoles) => {
+    if (!user?.roles) return false;
+    return requiredRoles.some(role => user.roles.includes(role));
+  };
+
+  // Rol bazlı menü öğeleri
+  const getMenuItems = () => {
+    const allMenuItems = [
+      { 
+        path: '/', 
+        label: 'Ana Sayfa', 
+        icon: '🏠',
+        description: 'Ana sayfa',
+        roles: ['Admin', 'Manager', 'User'] // Tüm roller
+      },
+      { 
+        path: '/charts', 
+        label: 'Grafikler', 
+        icon: '📈',
+        description: 'Grafik yönetimi ve görüntüleme',
+        roles: ['Admin', 'Manager', 'User'] // Tüm roller
+      },
+      { 
+        path: '/indicators', 
+        label: 'Gösterge Listesi', 
+        icon: '📊',
+        description: 'Gösterge yönetimi',
+        roles: ['Admin'] // Sadece Admin
+      },
+      { 
+        path: '/indicators/new', 
+        label: 'Yeni Gösterge', 
+        icon: '➕',
+        description: 'Yeni gösterge oluştur',
+        roles: ['Admin'] // Sadece Admin
+      },
+      { 
+        path: '/indicators/data-entry', 
+        label: 'Veri Girişi', 
+        icon: '📝',
+        description: 'Gösterge verilerini gir',
+        roles: ['Admin', 'Manager', 'User'] // Tüm roller
+      },
+      { 
+        path: '/performance', 
+        label: 'Performans Dönemleri', 
+        icon: '📅',
+        description: 'Performans dönemlerini yönet',
+        roles: ['Admin', 'Manager', 'User'] // Tüm roller
+      },
+      { 
+        path: '/performance/my-targets', 
+        label: 'Hedeflerim', 
+        icon: '🎯',
+        description: 'Size atanan hedefler',
+        roles: ['Admin', 'Manager', 'User'] // Tüm roller
+      },
+      { 
+        path: '/performance/target-management', 
+        label: 'Hedef Yönetimi', 
+        icon: '⚙️',
+        description: 'Hedefleri yönet ve onayla',
+        roles: ['Admin'] // Sadece Admin
+      },
+      { 
+        path: '/auth/profile', 
+        label: 'Profil', 
+        icon: '👤',
+        description: 'Profil bilgileri',
+        roles: ['Admin', 'Manager', 'User'] // Tüm roller
+      }
+    ];
+
+    // Kullanıcının rolüne göre menü öğelerini filtrele
+    return allMenuItems.filter(item => hasRole(item.roles));
+  };
+
+  const menuItems = getMenuItems();
 
   const isActive = (path) => {
     if (path === '/' && location.pathname === '/') return true;

@@ -516,7 +516,7 @@ export default function Chart3D({ data, options = {}, legendItems, groupLabels }
             {/* Debug Info removed for clean UI */}
             
             {/* Chart Area */}
-            <div style={{ flex: '1', position: 'relative' }}>
+            <div style={{ flex: '3', position: 'relative' }}>
                 {/* Chart Title */}
                 {options.plugins?.title?.display && (
                     <div style={{ 
@@ -625,7 +625,12 @@ export default function Chart3D({ data, options = {}, legendItems, groupLabels }
             </div>
             
             {/* Legend Panel */}
-            <div style={{ width: '250px', flexShrink: 0 }}>
+            <div style={{ 
+                flex: '1', 
+                maxHeight: '450px',
+                overflowY: 'auto',
+                paddingRight: '8px'
+            }}>
                 {(legendItems && legendItems.length > 0) ? (
                     <div className="chart-3d-legend" style={{ 
                         display: 'flex', 

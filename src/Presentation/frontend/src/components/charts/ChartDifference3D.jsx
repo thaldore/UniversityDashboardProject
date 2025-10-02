@@ -369,7 +369,7 @@ export default function ChartDifference3D({ formattedData, chart }) {
 
   return (
     <div style={{ display: 'flex', gap: 24, width: '100%', minHeight: 500 }}>
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div style={{ flex: 3, position: 'relative' }}>
         <div
           ref={canvasRef}
           style={{ width: '100%', height: 450, position: 'relative', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
@@ -413,7 +413,12 @@ export default function ChartDifference3D({ formattedData, chart }) {
           <Tooltip visible={tooltip.visible} position={tooltip.position} content={tooltip.content} />
         </div>
       </div>
-      <div style={{ width: 250, flexShrink: 0 }}>
+      <div style={{ 
+        flex: 1, 
+        maxHeight: 450,
+        overflowY: 'auto',
+        paddingRight: 8
+      }}>
         {(prepared.zLabels || []).map((label, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <div style={{ width: 16, height: 16, backgroundColor: prepared.colors[i], borderRadius: 3, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }} />

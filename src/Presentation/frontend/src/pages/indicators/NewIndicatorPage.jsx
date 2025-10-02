@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import indicatorService from '../../services/api/indicatorService';
 import { IndicatorDataType, PeriodType, getIndicatorDataTypeText, getPeriodTypeText } from '../../services/utils/constants';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -8,11 +9,15 @@ import '../../styles/pages/indicator-form-compact.css';
 
 const NewIndicatorPage = () => {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [departments, setDepartments] = useState([]);
     const [users, setUsers] = useState([]);
     const [loadingUsers, setLoadingUsers] = useState(false);
+
+    // Rol kontrolü - sadece Admin erişebilir
+    const isAdmin = user?.roles?.includes('Admin');
 
     const [formData, setFormData] = useState({
         indicatorCode: '',
@@ -35,8 +40,11 @@ const NewIndicatorPage = () => {
     });
 
     useEffect(() => {
-        loadDepartments();
-    }, []);
+        // Sadece Admin ise veri yükle
+        if (isAdmin) {
+            loadDepartments();
+        }
+    }, [isAdmin]);
 
     useEffect(() => {
         if (formData.departmentId) {
@@ -209,6 +217,22 @@ const NewIndicatorPage = () => {
     const handleCancel = () => {
         navigate('/indicators');
     };
+
+    // Admin değilse erişim reddedildi mesajı göster
+    if (!isAdmin) {
+        return (
+            <div className="access-denied">
+                <div className="access-denied-content">
+                    <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <h2>Erişim Reddedildi</h2>
+                    <p>Bu sayfaya erişim yetkiniz bulunmamaktadır.</p>
+                    <p>Sadece Admin kullanıcıları yeni gösterge oluşturabilir.</p>
+                </div>
+            </div>
+        );
+    }
 
     if (loading) return <LoadingSpinner />;
 
