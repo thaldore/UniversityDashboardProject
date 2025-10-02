@@ -166,6 +166,16 @@ const MyTargetsPage = () => {
     }
   };
 
+  // 6 renk skalası için gerçekleşme oranı sınıfını belirle
+  const getCompletionRateClass = (rate) => {
+    if (rate >= 101) return 'excellent';      // 101+ - Mükemmel yeşil
+    if (rate >= 81) return 'very-good';       // 81-100 - Çok iyi yeşil
+    if (rate >= 61) return 'good';            // 61-80 - İyi sarı-yeşil
+    if (rate >= 41) return 'fair';            // 41-60 - Orta sarı
+    if (rate >= 21) return 'poor';            // 21-40 - Kötü turuncu
+    return 'very-poor';                       // 0-20 - Çok kötü kırmızı
+  };
+
   const getFilteredTargets = (targetList) => {
     return targetList.filter(target => {
       // Durum filtresi
@@ -358,7 +368,7 @@ const MyTargetsPage = () => {
                         </div>
                         <div className="progress-item">
                           <label>Gerçekleşme Oranı:</label>
-                          <span className={`completion-rate ${target.completionRate >= 100 ? 'success' : target.completionRate >= 80 ? 'warning' : 'danger'}`}>
+                          <span className={`completion-rate ${getCompletionRateClass(target.completionRate)}`}>
                             {formatCompletionRate(target.completionRate)}
                           </span>
                         </div>
@@ -455,51 +465,54 @@ const MyTargetsPage = () => {
 
                     <div className="target-content">
                       <div className="target-info">
-                      <div className="info-item">
-                        <label>Dönem:</label>
-                        <span>{target.periodName}</span>
+                        <div className="info-item">
+                          <label>Dönem:</label>
+                          <span>{target.periodName}</span>
                         </div>
-                      <div className="info-item">
-                        <label>Hedef Değeri:</label>
-                        <span>{target.targetValue} {target.unit}</span>
+                        <div className="info-item">
+                          <label>Hedef Değeri:</label>
+                          <span>{target.targetValue} {target.unit}</span>
                         </div>
-                      <div className="info-item">
-                        <label>Ağırlık:</label>
-                        <span>{target.weight}%</span>
+                        <div className="info-item">
+                          <label>Ağırlık:</label>
+                          <span>{target.weight}%</span>
                         </div>
-                      <div className="info-item">
-                        <label>Yön:</label>
+                        <div className="info-item">
+                          <label>Yön:</label>
                           <span className={`direction-badge ${getTargetDirectionBadgeClass(target.direction)}`}>
                             {getTargetDirectionText(target.direction)}
                           </span>
                         </div>
-                        {target.actualValue !== null && (
-                        <div className="info-item">
-                          <label>Gerçekleşen:</label>
-                          <span>{target.actualValue} {target.unit}</span>
+                      </div>
+
+                      {target.actualValue !== null && (
+                        <div className="target-progress">
+                          <div className="progress-info">
+                            <div className="progress-item">
+                              <label>Gerçekleşen:</label>
+                              <span>{target.actualValue} {target.unit}</span>
+                            </div>
+                            <div className="progress-item">
+                              <label>Gerçekleşme Oranı:</label>
+                              <span className={`completion-rate ${getCompletionRateClass(target.completionRate)}`}>
+                                {formatCompletionRate(target.completionRate)}
+                              </span>
+                            </div>
+                            {target.status === 7 && target.score && (
+                              <div className="progress-item">
+                                <label>Puan:</label>
+                                <span className="score">{formatScore(target.score)}</span>
+                              </div>
+                            )}
+                            {target.status === 7 && target.letterGrade && (
+                              <div className="progress-item">
+                                <label>Harf Notu:</label>
+                                <span className="letter-grade">{target.letterGrade}</span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {target.completionRate !== null && (
-                        <div className="info-item">
-                          <label>Gerçekleşme Oranı:</label>
-                          <span className={`completion-rate ${target.completionRate >= 100 ? 'success' : target.completionRate >= 80 ? 'warning' : 'danger'}`}>
-                            {formatCompletionRate(target.completionRate)}
-                          </span>
-                          </div>
-                        )}
-                        {target.score && (
-                        <div className="info-item">
-                          <label>Puan:</label>
-                          <span className="score">{formatScore(target.score)}</span>
                         </div>
                       )}
-                      {target.letterGrade && (
-                        <div className="info-item">
-                          <label>Harf Notu:</label>
-                          <span className="letter-grade">{target.letterGrade}</span>
-                          </div>
-                        )}
-                      </div>
 
                       {(target.status === 3 || target.status === 5) && userPermissions[target.targetId]?.canAddProgress && ( // Approved veya ProgressDraft
                         <div className="target-actions-section">

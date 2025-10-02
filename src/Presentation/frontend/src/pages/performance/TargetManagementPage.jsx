@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Target, Plus, Users, Building, Eye, Edit, Trash2, CheckCircle, XCircle, Send, BarChart3, AlertCircle } from 'lucide-react';
+import { Target, Plus, Users, Building, Edit, Trash2, CheckCircle, XCircle, BarChart3, AlertCircle, Grid, List } from 'lucide-react';
 import performanceService from '../../services/api/performanceService';
 import PerformanceTargetModal from '../../components/performance/PerformanceTargetModal';
 import PerformanceTargetAssignModal from '../../components/performance/PerformanceTargetAssignModal';
 import PerformanceContributionTable from '../../components/performance/PerformanceContributionTable';
+import PerformanceTargetTable from '../../components/performance/PerformanceTargetTable';
 import { 
   getTargetStatusText, 
   getTargetStatusBadgeClass, 
@@ -28,6 +29,7 @@ const TargetManagementPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [departments, setDepartments] = useState([]);
   const [users, setUsers] = useState([]);
+  const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
 
   useEffect(() => {
     loadData();
@@ -115,6 +117,39 @@ const TargetManagementPage = () => {
     }
   };
 
+  // Tablo için event handler'lar
+  const handleTableApprove = (targetId) => {
+    handleApproveReject(targetId, true);
+  };
+
+  const handleTableReject = (targetId) => {
+    const reason = prompt('Red sebebi:');
+    if (reason) {
+      handleApproveReject(targetId, false, reason);
+    }
+  };
+
+  const handleTableApproveProgress = (progressId) => {
+    handleApproveRejectProgress(progressId, true);
+  };
+
+  const handleTableRejectProgress = (progressId) => {
+    const reason = prompt('Gerçekleşme red sebebi:');
+    if (reason) {
+      handleApproveRejectProgress(progressId, false, reason);
+    }
+  };
+
+  // 6 renk skalası için gerçekleşme oranı sınıfını belirle
+  const getCompletionRateClass = (rate) => {
+    if (rate >= 101) return 'excellent';      // 101+ - Mükemmel yeşil
+    if (rate >= 81) return 'very-good';       // 81-100 - Çok iyi yeşil
+    if (rate >= 61) return 'good';            // 61-80 - İyi sarı-yeşil
+    if (rate >= 41) return 'fair';            // 41-60 - Orta sarı
+    if (rate >= 21) return 'poor';            // 21-40 - Kötü turuncu
+    return 'very-poor';                       // 0-20 - Çok kötü kırmızı
+  };
+
   const handleDeleteTarget = async (targetId) => {
     if (window.confirm('Bu hedefi silmek istediğinizden emin misiniz?')) {
       try {
@@ -164,6 +199,22 @@ const TargetManagementPage = () => {
           <p>Performans hedeflerini yönetin, atayın ve onaylayın</p>
         </div>
         <div className="header-actions">
+          <div className="view-mode-toggle">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`btn btn-sm ${viewMode === 'table' ? 'btn-primary' : 'btn-secondary'}`}
+              title="Tablo Görünümü"
+            >
+              <List size={18} />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`btn btn-sm ${viewMode === 'grid' ? 'btn-primary' : 'btn-secondary'}`}
+              title="Kart Görünümü"
+            >
+              <Grid size={18} />
+            </button>
+          </div>
           <button
             onClick={handleCreateTarget}
             className="btn btn-primary"
@@ -272,57 +323,159 @@ const TargetManagementPage = () => {
 
       <div className="targets-container">
         {filteredTargets.length > 0 ? (
-          <div className="targets-table">
-            <table className="targets-table-content">
-              <thead>
-                <tr>
-                  <th>Hedef Adı</th>
-                  <th>Dönem</th>
-                  <th>Atanan</th>
-                  <th>Hedef Değeri</th>
-                  <th>Gerçekleşme</th>
-                  <th>Durum</th>
-                  <th>İşlemler</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTargets.map((target) => (
-                  <tr key={target.targetId}>
-                    <td className="target-name">
-                      <div className="target-info">
-                        <h4>{target.targetName}</h4>
-                        {target.description && (
-                          <p className="target-description">{target.description}</p>
+          viewMode === 'table' ? (
+            <PerformanceTargetTable
+              targets={filteredTargets}
+              onEdit={handleEditTarget}
+              onDelete={handleDeleteTarget}
+              onApprove={handleTableApprove}
+              onReject={handleTableReject}
+              onAssign={handleAssignTarget}
+              onViewContributions={handleViewContributions}
+              onApproveProgress={handleTableApproveProgress}
+              onRejectProgress={handleTableRejectProgress}
+            />
+          ) : (
+            <div className="targets-grid">
+            {filteredTargets.map((target) => (
+              <div key={target.targetId} className="target-card">
+                <div className="target-header">
+                  <div className="target-title">
+                    <h3>{target.targetName}</h3>
+                    <span className={`status-badge ${getTargetStatusBadgeClass(target.status)}`}>
+                      {getTargetStatusText(target.status)}
+                    </span>
+                  </div>
+                  <div className="target-actions">
+                    <button
+                      onClick={() => handleEditTarget(target)}
+                      className="btn btn-sm btn-secondary"
+                      title="Düzenle"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    
+                    {target.status === 2 && ( // Submitted
+                      <>
+                        <button
+                          onClick={() => handleApproveReject(target.targetId, true)}
+                          className="btn btn-sm btn-success"
+                          title="Onayla"
+                        >
+                          <CheckCircle size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const reason = prompt('Red sebebi:');
+                            if (reason) {
+                              handleApproveReject(target.targetId, false, reason);
+                            }
+                          }}
+                          className="btn btn-sm btn-danger"
+                          title="Reddet"
+                        >
+                          <XCircle size={16} />
+                        </button>
+                      </>
+                    )}
+                    
+                    {target.status === 5 && ( // ProgressDraft - Gerçekleşme onay/red butonları
+                      <>
+                        <button
+                          onClick={() => handleApproveRejectProgress(target.progressId, true)}
+                          className="btn btn-sm btn-success"
+                          title="Gerçekleşmeyi Onayla"
+                        >
+                          <CheckCircle size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const reason = prompt('Gerçekleşme red sebebi:');
+                            if (reason) {
+                              handleApproveRejectProgress(target.progressId, false, reason);
+                            }
+                          }}
+                          className="btn btn-sm btn-danger"
+                          title="Gerçekleşmeyi Reddet"
+                        >
+                          <XCircle size={16} />
+                        </button>
+                      </>
+                    )}
+                    
+                    <button
+                      onClick={() => handleAssignTarget(target)}
+                      className="btn btn-sm btn-info"
+                      title="Ata"
+                    >
+                      <Users size={16} />
+                    </button>
+                    
+                    {target.status === 7 && ( // ProgressApproved
+                      <button
+                        onClick={() => handleViewContributions(target)}
+                        className="btn btn-sm btn-primary"
+                        title="Katkı Analizi"
+                      >
+                        <BarChart3 size={16} />
+                      </button>
+                    )}
+                    
+                    <button
+                      onClick={() => handleDeleteTarget(target.targetId)}
+                      className="btn btn-sm btn-danger"
+                      title="Sil"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="target-content">
+                  <div className="target-info">
+                    {target.description && (
+                      <div className="info-item">
+                        <label>Açıklama:</label>
+                        <span>{target.description}</span>
+                      </div>
+                    )}
+                    
+                    <div className="info-item">
+                      <label>Dönem:</label>
+                      <span>{target.periodName}</span>
+                    </div>
+                    
+                    <div className="info-item">
+                      <label>Atanan:</label>
+                      <div className="assigned-to">
+                        {target.departmentName && (
+                          <div className="assigned-item">
+                            <Building size={16} />
+                            <span>{target.departmentName}</span>
+                          </div>
+                        )}
+                        {target.userName && (
+                          <div className="assigned-item">
+                            <Users size={16} />
+                            <span>{target.userName}</span>
+                          </div>
                         )}
                       </div>
-                    </td>
-                    <td className="period-name">
-                      {target.periodName}
-                    </td>
-                    <td className="assigned-to">
-                      {target.departmentName && (
-                        <div className="assigned-item">
-                          <Building size={16} />
-                          <span>{target.departmentName}</span>
-                        </div>
-                      )}
-                      {target.userName && (
-                        <div className="assigned-item">
-                          <Users size={16} />
-                          <span>{target.userName}</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="target-value">
-                      <div className="value-info">
-                        <span className="value">{target.targetValue}</span>
-                        <span className="unit">{target.unit}</span>
-                      </div>
-                      <div className="weight-info">
-                        Ağırlık: {target.weight}%
-                      </div>
-                    </td>
-                    <td className="progress-info">
+                    </div>
+                    
+                    <div className="info-item">
+                      <label>Hedef Değeri:</label>
+                      <span>{target.targetValue} {target.unit}</span>
+                    </div>
+                    
+                    <div className="info-item">
+                      <label>Ağırlık:</label>
+                      <span>{target.weight}%</span>
+                    </div>
+                  </div>
+                  
+                  <div className="target-progress">
+                    <div className="progress-info">
                       {target.actualValue !== null ? (
                         <div className="progress-details">
                           <div className="progress-item">
@@ -331,17 +484,17 @@ const TargetManagementPage = () => {
                           </div>
                           <div className="progress-item">
                             <label>Gerçekleşme Oranı:</label>
-                            <span className={`completion-rate ${target.completionRate >= 100 ? 'success' : target.completionRate >= 80 ? 'warning' : 'danger'}`}>
+                            <span className={`completion-rate ${getCompletionRateClass(target.completionRate)}`}>
                               {formatCompletionRate(target.completionRate)}
                             </span>
                           </div>
-                          {target.score && (
+                          {target.status === 7 && target.score && (
                             <div className="progress-item">
                               <label>Puan:</label>
                               <span className="score">{formatScore(target.score)}</span>
                             </div>
                           )}
-                          {target.letterGrade && (
+                          {target.status === 7 && target.letterGrade && (
                             <div className="progress-item">
                               <label>Harf Notu:</label>
                               <span className="letter-grade">{target.letterGrade}</span>
@@ -351,105 +504,13 @@ const TargetManagementPage = () => {
                       ) : (
                         <span className="no-progress">Henüz girilmedi</span>
                       )}
-                    </td>
-                    <td className="status">
-                      <span className={`status-badge ${getTargetStatusBadgeClass(target.status)}`}>
-                        {getTargetStatusText(target.status)}
-                      </span>
-                    </td>
-                    <td className="actions">
-                      <div className="action-buttons">
-                        {/* Düzenleme butonu - Draft, Rejected ve ProgressRejected durumlarında göster */}
-                        {(target.status === 1 || target.status === 4 || target.status === 8) && (
-                          <button
-                            onClick={() => handleEditTarget(target)}
-                            className="btn btn-sm btn-secondary"
-                            title="Düzenle"
-                          >
-                            <Edit size={16} />
-                          </button>
-                        )}
-                        
-                        {target.status === 2 && ( // Submitted
-                          <>
-                            <button
-                              onClick={() => handleApproveReject(target.targetId, true)}
-                              className="btn btn-sm btn-success"
-                              title="Onayla"
-                            >
-                              <CheckCircle size={16} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                const reason = prompt('Red sebebi:');
-                                if (reason) {
-                                  handleApproveReject(target.targetId, false, reason);
-                                }
-                              }}
-                              className="btn btn-sm btn-danger"
-                              title="Reddet"
-                            >
-                              <XCircle size={16} />
-                            </button>
-                          </>
-                        )}
-                        
-                        {target.status === 5 && ( // ProgressDraft - Gerçekleşme onay/red butonları
-                          <>
-                            <button
-                              onClick={() => handleApproveRejectProgress(target.progressId, true)}
-                              className="btn btn-sm btn-success"
-                              title="Gerçekleşmeyi Onayla"
-                            >
-                              <CheckCircle size={16} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                const reason = prompt('Gerçekleşme red sebebi:');
-                                if (reason) {
-                                  handleApproveRejectProgress(target.progressId, false, reason);
-                                }
-                              }}
-                              className="btn btn-sm btn-danger"
-                              title="Gerçekleşmeyi Reddet"
-                            >
-                              <XCircle size={16} />
-                            </button>
-                          </>
-                        )}
-                        
-                        <button
-                          onClick={() => handleAssignTarget(target)}
-                          className="btn btn-sm btn-info"
-                          title="Ata"
-                        >
-                          <Users size={16} />
-                        </button>
-                        
-                        {target.status === 7 && ( // ProgressApproved
-                          <button
-                            onClick={() => handleViewContributions(target)}
-                            className="btn btn-sm btn-primary"
-                            title="Katkı Analizi"
-                          >
-                            <BarChart3 size={16} />
-                          </button>
-                        )}
-                        
-                        <button
-                          onClick={() => handleDeleteTarget(target.targetId)}
-                          className="btn btn-sm btn-danger"
-                          title="Sil"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            </div>
+          )
         ) : (
           <div className="empty-state">
             <Target size={48} />
