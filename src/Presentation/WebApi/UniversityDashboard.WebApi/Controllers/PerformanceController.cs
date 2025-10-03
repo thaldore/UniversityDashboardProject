@@ -720,6 +720,36 @@ namespace UniversityDashBoardProject.WebApi.Controllers
             }
         }
 
+        [HttpGet("user/{userId}/personal-targets-summary")]
+        public async Task<ActionResult<PerformanceSummaryDto>> GetPersonalTargetsSummary(int userId, [FromQuery] int periodId)
+        {
+            try
+            {
+                var result = await _performanceService.GetPersonalTargetsSummaryAsync(userId, periodId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Kişisel hedefler özeti alınırken hata oluştu. UserId: {UserId}, PeriodId: {PeriodId}", userId, periodId);
+                return StatusCode(500, new { message = "Kişisel hedefler özeti alınırken hata oluştu.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("department/{departmentId}/targets-summary")]
+        public async Task<ActionResult<PerformanceSummaryDto>> GetDepartmentTargetsSummary(int departmentId, [FromQuery] int periodId)
+        {
+            try
+            {
+                var result = await _performanceService.GetDepartmentTargetsSummaryAsync(departmentId, periodId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Departman hedefleri özeti alınırken hata oluştu. DepartmentId: {DepartmentId}, PeriodId: {PeriodId}", departmentId, periodId);
+                return StatusCode(500, new { message = "Departman hedefleri özeti alınırken hata oluştu.", error = ex.Message });
+            }
+        }
+
         #endregion
 
         #region Helper Methods

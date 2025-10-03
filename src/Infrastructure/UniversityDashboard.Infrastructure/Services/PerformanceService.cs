@@ -267,9 +267,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     Direction = t.Direction,
                     Status = t.Status,
                     CreatedAt = t.CreatedAt,
-                    CompletionRate = t.Progresses.Where(p => p.Status == ProgressStatus.Approved || p.Status == ProgressStatus.Draft).Sum(p => p.ProgressValue) > 0 && t.TargetValue > 0 
-                        ? (t.Progresses.Where(p => p.Status == ProgressStatus.Approved || p.Status == ProgressStatus.Draft).Sum(p => p.ProgressValue) / t.TargetValue) * 100 
-                        : null,
+                    CompletionRate = null, // Bu değer aşağıda hesaplanacak
                     ProgressId = t.Progresses.Where(p => p.Status == ProgressStatus.Draft).OrderByDescending(p => p.CreatedAt).Select(p => p.ProgressId).FirstOrDefault(),
                     Score = null, // Bu değerler sonradan hesaplanacak
                     LetterGrade = null // Bu değerler sonradan hesaplanacak
@@ -282,6 +280,9 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             {
                 if (target.ActualValue.HasValue && target.TargetValue > 0)
                 {
+                    // CompletionRate hesapla (Direction'a göre)
+                    target.CompletionRate = CalculateCompletionRate(target.TargetValue, target.ActualValue.Value, (TargetDirection)target.Direction);
+                    
                     var score = await CalculateTargetScoreAsync(target.TargetId, target.ActualValue.Value);
                     target.Score = score;
                     
@@ -1163,6 +1164,80 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 .FirstOrDefaultAsync();
 
             return scoring?.LetterGrade ?? "";
+        }
+
+        public async Task<PerformanceSummaryDto> GetPersonalTargetsSummaryAsync(int userId, int periodId)
+        {
+            try
+            {
+                var targets = await _context.PerformanceTargets
+                    .Where(t => t.UserId == userId && t.PeriodId == periodId)
+                    .ToListAsync();
+
+                var totalWeight = targets.Sum(t => t.Weight);
+                var totalScore = 0m;
+                var targetCount = targets.Count;
+
+                // Sadece onaylanmış hedefler için puan hesapla
+                foreach (var target in targets.Where(t => t.Status == TargetStatus.ProgressApproved && t.ActualValue.HasValue))
+                {
+                    var targetScore = await CalculateTargetScoreAsync(target.TargetId);
+                    if (targetScore.Score.HasValue)
+                    {
+                        totalScore += (targetScore.Score.Value * target.Weight / 100);
+                    }
+                }
+
+                return new PerformanceSummaryDto
+                {
+                    TotalWeight = totalWeight,
+                    TotalScore = totalScore,
+                    TargetCount = targetCount,
+                    SummaryType = "Personal"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Kişisel hedefler özeti alınırken hata oluştu. UserId: {UserId}, PeriodId: {PeriodId}", userId, periodId);
+                throw;
+            }
+        }
+
+        public async Task<PerformanceSummaryDto> GetDepartmentTargetsSummaryAsync(int departmentId, int periodId)
+        {
+            try
+            {
+                var targets = await _context.PerformanceTargets
+                    .Where(t => t.DepartmentId == departmentId && t.PeriodId == periodId)
+                    .ToListAsync();
+
+                var totalWeight = targets.Sum(t => t.Weight);
+                var totalScore = 0m;
+                var targetCount = targets.Count;
+
+                // Sadece onaylanmış hedefler için puan hesapla
+                foreach (var target in targets.Where(t => t.Status == TargetStatus.ProgressApproved && t.ActualValue.HasValue))
+                {
+                    var targetScore = await CalculateTargetScoreAsync(target.TargetId);
+                    if (targetScore.Score.HasValue)
+                    {
+                        totalScore += (targetScore.Score.Value * target.Weight / 100);
+                    }
+                }
+
+                return new PerformanceSummaryDto
+                {
+                    TotalWeight = totalWeight,
+                    TotalScore = totalScore,
+                    TargetCount = targetCount,
+                    SummaryType = "Department"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Departman hedefleri özeti alınırken hata oluştu. DepartmentId: {DepartmentId}, PeriodId: {PeriodId}", departmentId, periodId);
+                throw;
+            }
         }
 
         #endregion

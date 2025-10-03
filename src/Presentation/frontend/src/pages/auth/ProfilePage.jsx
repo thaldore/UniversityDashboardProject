@@ -15,8 +15,8 @@ const ProfilePage = () => {
     const fetchProfile = async () => {
       try {
         setLoading(true);
-        const profileData = await authService.getProfile(user.id);
-        setProfile(profileData);
+        const response = await authService.getProfile();
+        setProfile(response.data);
       } catch (error) {
         console.error('Profil yüklenemedi:', error);
         setError('Profil bilgileri yüklenirken bir hata oluştu.');

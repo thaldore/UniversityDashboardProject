@@ -74,6 +74,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     FirstName = user.FirstName,
                     LastName = user.LastName,
                     DepartmentId = user.DepartmentId,
+                    DepartmentName = user.Department?.DepartmentName,
                     Roles = roles.ToList()
                 }
             };
@@ -129,6 +130,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     FirstName = user.FirstName,
                     LastName = user.LastName,
                     DepartmentId = user.DepartmentId,
+                    DepartmentName = user.Department?.DepartmentName,
                     Roles = roles.ToList()
                 }
             };
@@ -163,6 +165,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     FirstName = user.FirstName,
                     LastName = user.LastName,
                     DepartmentId = user.DepartmentId,
+                    DepartmentName = user.Department?.DepartmentName,
                     Roles = roles.ToList()
                 }
             };

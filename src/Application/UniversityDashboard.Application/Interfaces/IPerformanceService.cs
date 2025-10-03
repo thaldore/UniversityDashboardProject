@@ -59,5 +59,9 @@ namespace UniversityDashBoardProject.Application.Interfaces
         Task<bool> CanUserSubmitDepartmentTargetAsync(int userId, int targetId);
         Task<bool> CanUserAddProgressToDepartmentTargetAsync(int userId, int targetId);
         Task<List<DepartmentDto>> GetUserAuthorizedDepartmentsAsync(int userId, int periodId);
+        
+        // Performance Summary Methods
+        Task<PerformanceSummaryDto> GetPersonalTargetsSummaryAsync(int userId, int periodId);
+        Task<PerformanceSummaryDto> GetDepartmentTargetsSummaryAsync(int departmentId, int periodId);
     }
 }

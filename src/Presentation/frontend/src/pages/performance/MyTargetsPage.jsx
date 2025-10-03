@@ -32,6 +32,8 @@ const MyTargetsPage = () => {
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [filter, setFilter] = useState('all'); // all, completed, pending
   const [periodFilter, setPeriodFilter] = useState('all'); // all, periodId
+  const [personalSummary, setPersonalSummary] = useState(null);
+  const [departmentSummary, setDepartmentSummary] = useState(null);
 
 
   const loadUserPermissions = useCallback(async (targets) => {
@@ -62,6 +64,28 @@ const MyTargetsPage = () => {
       setUserPermissions(permissions);
     } catch (error) {
       console.error('Kullanıcı yetkileri yüklenirken hata:', error);
+    }
+  }, [user]);
+
+  const loadSummaryData = useCallback(async (selectedPeriodId) => {
+    if (!selectedPeriodId || selectedPeriodId === 'all' || !user?.id) {
+      setPersonalSummary(null);
+      setDepartmentSummary(null);
+      return;
+    }
+
+    try {
+      const [personalResponse, departmentResponse] = await Promise.all([
+        performanceService.getPersonalTargetsSummary(user.id, selectedPeriodId),
+        user.departmentId ? performanceService.getDepartmentTargetsSummary(user.departmentId, selectedPeriodId) : null
+      ]);
+
+      setPersonalSummary(personalResponse.data);
+      if (departmentResponse) {
+        setDepartmentSummary(departmentResponse.data);
+      }
+    } catch (error) {
+      console.error('Özet verileri yüklenirken hata:', error);
     }
   }, [user]);
 
@@ -112,6 +136,10 @@ const MyTargetsPage = () => {
       loadData();
     }
   }, [user?.id, loadData]);
+
+  useEffect(() => {
+    loadSummaryData(periodFilter);
+  }, [periodFilter, loadSummaryData]);
 
   const handleCreateTarget = () => {
     setEditingTarget(null);
@@ -292,10 +320,28 @@ const MyTargetsPage = () => {
         {/* Kullanıcı Hedefleri */}
         {userTargets.length > 0 && (
           <div className="targets-section">
-            <h2 className="section-title">
-              <Target size={20} />
-              Kişisel Hedeflerim
-            </h2>
+            <div className="section-header">
+              <h2 className="section-title">
+                <Target size={20} />
+                Kişisel Hedeflerim
+              </h2>
+              {personalSummary && periodFilter !== 'all' && (
+                <div className="summary-info">
+                  <div className="summary-item">
+                    <span className="summary-label">Toplam Ağırlık:</span>
+                    <span className="summary-value">{personalSummary.totalWeight.toFixed(1)}%</span>
+                  </div>
+                  <div className="summary-item">
+                    <span className="summary-label">Toplam Puan:</span>
+                    <span className="summary-value">{personalSummary.totalScore.toFixed(1)}</span>
+                  </div>
+                  <div className="summary-item">
+                    <span className="summary-label">Hedef Sayısı:</span>
+                    <span className="summary-value">{personalSummary.targetCount}</span>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="targets-grid">
               {getFilteredTargets(userTargets).map((target) => (
               <div key={target.targetId} className="target-card">
@@ -418,10 +464,28 @@ const MyTargetsPage = () => {
         {/* Departman Hedefleri */}
         {departmentTargets.length > 0 && (
           <div className="targets-section">
-            <h2 className="section-title">
-              <Building size={20} />
-              Departman Hedefleri
-            </h2>
+            <div className="section-header">
+              <h2 className="section-title">
+                <Building size={20} />
+                Departman Hedefleri
+              </h2>
+              {departmentSummary && periodFilter !== 'all' && (
+                <div className="summary-info">
+                  <div className="summary-item">
+                    <span className="summary-label">Toplam Ağırlık:</span>
+                    <span className="summary-value">{departmentSummary.totalWeight.toFixed(1)}%</span>
+                  </div>
+                  <div className="summary-item">
+                    <span className="summary-label">Toplam Puan:</span>
+                    <span className="summary-value">{departmentSummary.totalScore.toFixed(1)}</span>
+                  </div>
+                  <div className="summary-item">
+                    <span className="summary-label">Hedef Sayısı:</span>
+                    <span className="summary-value">{departmentSummary.targetCount}</span>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="targets-grid">
               {getFilteredTargets(departmentTargets).map((target) => (
                 <div key={target.targetId} className="target-card">

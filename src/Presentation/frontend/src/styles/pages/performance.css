@@ -1,5 +1,71 @@
 /* Performance System Styles */
 
+/* Summary Info Styles */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--gray-200);
+}
+
+.summary-info {
+  display: flex;
+  gap: 2rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, var(--primary-50) 0%, var(--primary-100) 100%);
+  border-radius: 8px;
+  border: 1px solid var(--primary-200);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.summary-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary-600);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary-800);
+  padding: 0.25rem 0.5rem;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid var(--primary-200);
+  min-width: 60px;
+  text-align: center;
+}
+
+/* Responsive summary */
+@media (max-width: 768px) {
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .summary-info {
+    width: 100%;
+    justify-content: space-around;
+    gap: 1rem;
+  }
+  
+  .summary-item {
+    flex: 1;
+  }
+}
+
 /* Performance List Page */
 .performance-list-page {
   padding: 2rem;

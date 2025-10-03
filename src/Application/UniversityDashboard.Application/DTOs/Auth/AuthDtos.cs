@@ -38,6 +38,7 @@ namespace UniversityDashBoardProject.Application.DTOs.Auth
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public int? DepartmentId { get; set; }
+        public string? DepartmentName { get; set; }
         public List<string> Roles { get; set; } = new List<string>();
     }
 

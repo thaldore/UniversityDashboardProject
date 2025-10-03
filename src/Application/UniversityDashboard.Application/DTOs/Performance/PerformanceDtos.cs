@@ -147,4 +147,12 @@ namespace UniversityDashBoardProject.Application.DTOs.Performance
         public decimal TotalAmount { get; set; }
         public decimal ContributionPercentage { get; set; }
     }
+
+    public class PerformanceSummaryDto
+    {
+        public decimal TotalWeight { get; set; }
+        public decimal TotalScore { get; set; }
+        public int TargetCount { get; set; }
+        public string SummaryType { get; set; } = string.Empty; // "Personal" or "Department"
+    }
 }

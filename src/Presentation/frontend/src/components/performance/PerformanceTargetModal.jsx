@@ -54,7 +54,7 @@ const PerformanceTargetModal = ({ isOpen, onClose, onSuccess, target = null, isE
           targetValue: 0,
           unit: '',
           weight: 0,
-          direction: 1,
+          direction: 1, // Positive
           assignedToUserId: targetModalMode === 'user' ? (user?.id || null) : null,
           assignedToDepartmentId: targetModalMode === 'department' ? (selectedDepartment?.departmentId || null) : null
         });
@@ -81,7 +81,9 @@ const PerformanceTargetModal = ({ isOpen, onClose, onSuccess, target = null, isE
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : (type === 'number' ? parseFloat(value) || 0 : value)
+      [name]: type === 'checkbox' ? checked : 
+              (type === 'number' ? parseFloat(value) || 0 : 
+               (name === 'direction' ? parseInt(value) : value))
     }));
   };
 
@@ -112,7 +114,33 @@ const PerformanceTargetModal = ({ isOpen, onClose, onSuccess, target = null, isE
       onClose();
     } catch (error) {
       console.error('Performans hedefi kaydedilirken hata:', error);
-      setErrors([error.response?.data?.message || 'Bir hata oluştu.']);
+      console.error('Error response:', error.response?.data);
+      
+      let errorMessages = ['Bir hata oluştu.'];
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        
+        if (errorData.message) {
+          errorMessages = [errorData.message];
+        } else if (errorData.errors) {
+          // Validation errors
+          errorMessages = [];
+          Object.keys(errorData.errors).forEach(key => {
+            if (Array.isArray(errorData.errors[key])) {
+              errorData.errors[key].forEach(err => {
+                errorMessages.push(`${key}: ${err}`);
+              });
+            } else {
+              errorMessages.push(`${key}: ${errorData.errors[key]}`);
+            }
+          });
+        } else if (typeof errorData === 'string') {
+          errorMessages = [errorData];
+        }
+      }
+      
+      setErrors(errorMessages);
     } finally {
       setLoading(false);
     }

@@ -176,6 +176,15 @@ const performanceService = {
 
   async canUserAddProgressToDepartmentTarget(userId, targetId) {
     return await apiClient.get(`/performance/user/${userId}/can-add-progress-to-department-target?targetId=${targetId}`);
+  },
+
+  // Performance Summary Methods
+  async getPersonalTargetsSummary(userId, periodId) {
+    return await apiClient.get(`/performance/user/${userId}/personal-targets-summary?periodId=${periodId}`);
+  },
+
+  async getDepartmentTargetsSummary(departmentId, periodId) {
+    return await apiClient.get(`/performance/department/${departmentId}/targets-summary?periodId=${periodId}`);
   }
 };
 
