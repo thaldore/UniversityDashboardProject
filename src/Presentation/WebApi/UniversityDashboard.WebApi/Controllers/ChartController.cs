@@ -65,7 +65,16 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<bool>> UpdateChartSection(int id, [FromBody] UpdateChartSectionRequest request)
         {
-            var result = await _chartService.UpdateChartSectionAsync(id, request);
+            var command = new UpdateChartSectionCommand
+            {
+                SectionId = id,
+                SectionName = request.SectionName,
+                Description = request.Description,
+                DisplayOrder = request.DisplayOrder,
+                IsActive = request.IsActive
+            };
+
+            var result = await _mediator.Send(command);
             if (!result)
                 return NotFound($"Chart section with ID {id} not found.");
 
@@ -79,7 +88,12 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<bool>> DeleteChartSection(int id)
         {
-            var result = await _chartService.DeleteChartSectionAsync(id);
+            var command = new DeleteChartSectionCommand
+            {
+                SectionId = id
+            };
+
+            var result = await _mediator.Send(command);
             if (!result)
                 return NotFound($"Chart section with ID {id} not found.");
 
@@ -152,7 +166,13 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
             int id, 
             [FromQuery] int? filterId = null)
         {
-            var result = await _chartService.GetChartHistoricalDataAsync(id, filterId);
+            var query = new GetChartHistoricalDataQuery
+            {
+                ChartId = id,
+                FilterId = filterId
+            };
+
+            var result = await _mediator.Send(query);
             return Ok(result);
         }
 
@@ -319,7 +339,8 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
         [HttpGet("types")]
         public async Task<ActionResult<List<string>>> GetSupportedChartTypes()
         {
-            var result = await _chartService.GetSupportedChartTypesAsync();
+            var query = new GetSupportedChartTypesQuery();
+            var result = await _mediator.Send(query);
             return Ok(result);
         }
 
@@ -330,7 +351,12 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<bool>> ValidateChartConfiguration(int id)
         {
-            var result = await _chartService.ValidateChartConfigurationAsync(id);
+            var query = new ValidateChartConfigurationQuery
+            {
+                ChartId = id
+            };
+
+            var result = await _mediator.Send(query);
             return Ok(new { IsValid = result });
         }
 

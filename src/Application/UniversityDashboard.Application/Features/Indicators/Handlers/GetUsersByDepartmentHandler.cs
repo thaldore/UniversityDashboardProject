@@ -1,7 +1,7 @@
 using MediatR;
 using UniversityDashBoardProject.Application.Features.Indicators.Queries;
-using UniversityDashBoardProject.Application.DTOs.Indicator;
 using UniversityDashBoardProject.Application.Interfaces;
+using UniversityDashBoardProject.Application.DTOs.Indicator;
 using Serilog;
 
 namespace UniversityDashBoardProject.Application.Features.Indicators.Handlers
@@ -23,12 +23,13 @@ namespace UniversityDashBoardProject.Application.Features.Indicators.Handlers
             try
             {
                 var result = await _indicatorService.GetUsersByDepartmentAsync(request.DepartmentId);
-                _logger.Information("Users retrieved successfully for department: {DepartmentId}, count: {Count}", request.DepartmentId, result.Count);
+                _logger.Information("Users retrieved successfully for department: {DepartmentId}, count: {Count}", 
+                    request.DepartmentId, result.Count);
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error getting users by department: {DepartmentId}", request.DepartmentId);
+                _logger.Error(ex, "Error getting users for department: {DepartmentId}", request.DepartmentId);
                 throw;
             }
         }

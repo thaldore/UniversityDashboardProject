@@ -3,7 +3,7 @@ using UniversityDashBoardProject.Application.DTOs.Indicator;
 
 namespace UniversityDashBoardProject.Application.Features.Indicators.Queries
 {
-    public class GetIndicatorGroupsQuery : IRequest<List<DepartmentDto>>
+    public class GetDepartmentsQuery : IRequest<List<DepartmentDto>>
     {
     }
 }

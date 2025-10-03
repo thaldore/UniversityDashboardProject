@@ -139,7 +139,13 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.TogglePerformancePeriodStatusAsync(id, isActive);
+                var command = new TogglePerformancePeriodStatusCommand
+                {
+                    PeriodId = id,
+                    IsActive = isActive
+                };
+
+                var result = await _mediator.Send(command);
                 
                 if (!result)
                     return NotFound(new { message = "Performans dönemi bulunamadı." });
@@ -456,7 +462,13 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.CreatePerformanceScoringAsync(periodId, request);
+                var command = new CreatePerformanceScoringCommand
+                {
+                    PeriodId = periodId,
+                    Request = request
+                };
+
+                var result = await _mediator.Send(command);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -471,7 +483,13 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.UpdatePerformanceScoringAsync(id, request);
+                var command = new UpdatePerformanceScoringCommand
+                {
+                    ScoringId = id,
+                    Request = request
+                };
+
+                var result = await _mediator.Send(command);
                 
                 if (!result)
                     return NotFound(new { message = "Performans puanlaması bulunamadı." });
@@ -490,7 +508,12 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.DeletePerformanceScoringAsync(id);
+                var command = new DeletePerformanceScoringCommand
+                {
+                    ScoringId = id
+                };
+
+                var result = await _mediator.Send(command);
                 
                 if (!result)
                     return NotFound(new { message = "Performans puanlaması bulunamadı." });
@@ -527,7 +550,13 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.CreatePerformanceAssignmentAsync(periodId, request);
+                var command = new CreatePerformanceAssignmentCommand
+                {
+                    PeriodId = periodId,
+                    Request = request
+                };
+
+                var result = await _mediator.Send(command);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -542,7 +571,12 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.DeletePerformanceAssignmentAsync(id);
+                var command = new DeletePerformanceAssignmentCommand
+                {
+                    AssignmentId = id
+                };
+
+                var result = await _mediator.Send(command);
                 
                 if (!result)
                     return NotFound(new { message = "Performans ataması bulunamadı." });
@@ -624,7 +658,13 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.CalculateTargetScoreAsync(targetId, actualValue);
+                var query = new CalculateTargetScoreQuery
+                {
+                    TargetId = targetId,
+                    ActualValue = actualValue
+                };
+
+                var result = await _mediator.Send(query);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -641,7 +681,14 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.CalculateTotalWeightAsync(departmentId, userId, periodId);
+                var query = new CalculateTotalWeightQuery
+                {
+                    DepartmentId = departmentId,
+                    UserId = userId,
+                    PeriodId = periodId
+                };
+
+                var result = await _mediator.Send(query);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -655,7 +702,13 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.GetUserAuthorizedDepartmentsAsync(userId, periodId);
+                var query = new GetUserAuthorizedDepartmentsQuery
+                {
+                    UserId = userId,
+                    PeriodId = periodId
+                };
+
+                var result = await _mediator.Send(query);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -669,7 +722,14 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.CanUserCreateDepartmentTargetAsync(userId, periodId, departmentId);
+                var query = new CanUserCreateDepartmentTargetQuery
+                {
+                    UserId = userId,
+                    PeriodId = periodId,
+                    DepartmentId = departmentId
+                };
+
+                var result = await _mediator.Send(query);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -683,7 +743,13 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.CanUserEditDepartmentTargetAsync(userId, targetId);
+                var query = new CanUserEditDepartmentTargetQuery
+                {
+                    UserId = userId,
+                    TargetId = targetId
+                };
+
+                var result = await _mediator.Send(query);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -697,7 +763,13 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.CanUserSubmitDepartmentTargetAsync(userId, targetId);
+                var query = new CanUserSubmitDepartmentTargetQuery
+                {
+                    UserId = userId,
+                    TargetId = targetId
+                };
+
+                var result = await _mediator.Send(query);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -711,7 +783,13 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.CanUserAddProgressToDepartmentTargetAsync(userId, targetId);
+                var query = new CanUserAddProgressToDepartmentTargetQuery
+                {
+                    UserId = userId,
+                    TargetId = targetId
+                };
+
+                var result = await _mediator.Send(query);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -725,7 +803,13 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.GetPersonalTargetsSummaryAsync(userId, periodId);
+                var query = new GetPersonalTargetsSummaryQuery
+                {
+                    UserId = userId,
+                    PeriodId = periodId
+                };
+
+                var result = await _mediator.Send(query);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -740,7 +824,13 @@ namespace UniversityDashBoardProject.WebApi.Controllers
         {
             try
             {
-                var result = await _performanceService.GetDepartmentTargetsSummaryAsync(departmentId, periodId);
+                var query = new GetDepartmentTargetsSummaryQuery
+                {
+                    DepartmentId = departmentId,
+                    PeriodId = periodId
+                };
+
+                var result = await _mediator.Send(query);
                 return Ok(result);
             }
             catch (Exception ex)

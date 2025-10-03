@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UniversityDashBoardProject.Application.DTOs.Auth;
 using UniversityDashBoardProject.Application.Features.Auth.Commands;
+using UniversityDashBoardProject.Application.Features.Auth.Queries;
 using UniversityDashBoardProject.Application.Interfaces;
 using Serilog;
 using System.Security.Claims;
@@ -85,7 +86,8 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
                 }
 
                 _logger.Information("Profile request received for user ID: {UserId}", userId);
-                var result = await _authService.GetUserProfileAsync(userId);
+                var query = new GetUserProfileQuery { UserId = userId };
+                var result = await _mediator.Send(query);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -108,7 +110,8 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
                 }
 
                 _logger.Information("Summary request received for user ID: {UserId}", userId);
-                var result = await _authService.GetUserSummaryAsync(userId);
+                var query = new GetUserSummaryQuery { UserId = userId };
+                var result = await _mediator.Send(query);
                 return Ok(result);
             }
             catch (Exception ex)
