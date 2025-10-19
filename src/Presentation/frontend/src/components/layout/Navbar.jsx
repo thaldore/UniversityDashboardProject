@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getInitials } from '../../services/utils/helpers';
+import NotificationBell from '../notifications/NotificationBell';
+import NotificationDropdown from '../notifications/NotificationDropdown';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -25,6 +28,8 @@ const Navbar = () => {
         </div>
 
         <div className="navbar-menu">
+          <NotificationBell onOpenNotifications={() => setShowNotifications(true)} />
+          
           <div className="user-menu">
             <div className="user-info">
               <div className="user-name">
@@ -46,7 +51,10 @@ const Navbar = () => {
             {showUserMenu && (
               <div className="user-dropdown">
                 <a href="/auth/profile" className="user-dropdown-item">
-                  <span className="user-dropdown-icon">👤</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
                   Profil
                 </a>
                 <hr className="user-dropdown-divider" />
@@ -54,7 +62,11 @@ const Navbar = () => {
                   onClick={handleLogout}
                   className="user-dropdown-item user-dropdown-logout"
                 >
-                  <span className="user-dropdown-icon">�</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
                   Çıkış Yap
                 </button>
               </div>
@@ -62,6 +74,11 @@ const Navbar = () => {
           </div>
         </div>
       </div>
+      
+      <NotificationDropdown 
+        isOpen={showNotifications} 
+        onClose={() => setShowNotifications(false)} 
+      />
     </nav>
   );
 };

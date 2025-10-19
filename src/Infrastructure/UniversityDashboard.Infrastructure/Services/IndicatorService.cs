@@ -15,12 +15,17 @@ namespace UniversityDashBoardProject.Infrastructure.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly IPeriodCalculationService _periodCalculationService;
+        private readonly INotificationService _notificationService;
         private readonly Serilog.ILogger _logger = Log.ForContext<IndicatorService>();
 
-        public IndicatorService(ApplicationDbContext context, IPeriodCalculationService periodCalculationService)
+        public IndicatorService(
+            ApplicationDbContext context, 
+            IPeriodCalculationService periodCalculationService,
+            INotificationService notificationService)
         {
             _context = context;
             _periodCalculationService = periodCalculationService;
+            _notificationService = notificationService;
         }
 
         public async Task<int> CreateIndicatorAsync(CreateIndicatorRequest request, int createdBy)
@@ -77,6 +82,26 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             }
 
             await _context.SaveChangesAsync();
+            
+            // Bildirim gönder
+            if (request.AssignedUserId.HasValue || request.NotificationUserId.HasValue)
+            {
+                try
+                {
+                    await _notificationService.NotifyIndicatorDataEntryAsync(
+                        indicator.IndicatorId,
+                        request.AssignedUserId ?? createdBy,
+                        request.NotificationUserId
+                    );
+                    _logger.Information("Notification sent for indicator: {IndicatorId}", indicator.IndicatorId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error(ex, "Failed to send notification for indicator: {IndicatorId}", indicator.IndicatorId);
+                    // Bildirim hatası gösterge oluşturmayı engellemez
+                }
+            }
+            
             return indicator.IndicatorId;
         }
 

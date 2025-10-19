@@ -37,6 +37,9 @@ namespace UniversityDashBoardProject.Infrastructure.Persistence
         public DbSet<PerformanceTargetProgress> PerformanceTargetProgresses { get; set; }
         public DbSet<PerformanceScoring> PerformanceScorings { get; set; }
 
+        // Notification related DbSet
+        public DbSet<Notification> Notifications { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -477,6 +480,37 @@ namespace UniversityDashBoardProject.Infrastructure.Persistence
                     .WithMany(pp => pp.Scorings)
                     .HasForeignKey(ps => ps.PeriodId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Notification configuration
+            builder.Entity<Notification>(entity =>
+            {
+                entity.HasKey(n => n.Id);
+                
+                entity.Property(n => n.Title)
+                    .HasMaxLength(200)
+                    .IsRequired();
+                    
+                entity.Property(n => n.Message)
+                    .HasMaxLength(1000)
+                    .IsRequired();
+                    
+                entity.Property(n => n.Type)
+                    .HasConversion<string>();
+                    
+                entity.Property(n => n.ActionUrl)
+                    .HasMaxLength(500);
+                    
+                entity.Property(n => n.RelatedEntityType)
+                    .HasMaxLength(100);
+                
+                entity.HasOne(n => n.RecipientUser)
+                    .WithMany()
+                    .HasForeignKey(n => n.RecipientUserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                    
+                entity.HasIndex(n => new { n.RecipientUserId, n.IsRead });
+                entity.HasIndex(n => n.CreatedAt);
             });
         }
     }

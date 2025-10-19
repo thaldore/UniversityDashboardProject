@@ -14,6 +14,7 @@ import ChartsPage from './pages/charts/ChartsPage';
 import PerformanceListPage from './pages/performance/PerformanceListPage';
 import MyTargetsPage from './pages/performance/MyTargetsPage';
 import TargetManagementPage from './pages/performance/TargetManagementPage';
+import NotificationsPage from './pages/notifications/NotificationsPage';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
 // CSS imports
@@ -154,6 +155,16 @@ function AppRoutes() {
           element={
             <PrivateRoute>
               <TargetManagementPage />
+            </PrivateRoute>
+          } 
+        />
+        
+        {/* Notification Routes */}
+        <Route 
+          path="/notifications" 
+          element={
+            <PrivateRoute>
+              <NotificationsPage />
             </PrivateRoute>
           } 
         />

@@ -364,8 +364,16 @@
   color: var(--danger-700);
 }
 
+.user-dropdown-item svg {
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
 .user-dropdown-icon {
   font-size: var(--font-size-base);
+  margin-right: 8px;
 }
 
 .user-dropdown-divider {

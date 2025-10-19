@@ -12,11 +12,13 @@ namespace UniversityDashBoardProject.Infrastructure.Services
     public class PerformanceService : IPerformanceService
     {
         private readonly ApplicationDbContext _context;
+        private readonly INotificationService _notificationService;
         private readonly Serilog.ILogger _logger = Log.ForContext<PerformanceService>();
 
-        public PerformanceService(ApplicationDbContext context)
+        public PerformanceService(ApplicationDbContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         #region Performance Period Methods
@@ -483,7 +485,10 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
         public async Task<bool> ApproveRejectPerformanceTargetAsync(int targetId, ApproveRejectTargetRequest request)
         {
-            var target = await _context.PerformanceTargets.FindAsync(targetId);
+            var target = await _context.PerformanceTargets
+                .Include(t => t.User)
+                .FirstOrDefaultAsync(t => t.TargetId == targetId);
+            
             if (target == null) return false;
 
             if (request.IsApproved)
@@ -500,6 +505,15 @@ namespace UniversityDashBoardProject.Infrastructure.Services
 
             target.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+            
+            // Bildirim gönder
+            var targetOwnerUserId = target.UserId ?? target.CreatedBy;
+            await _notificationService.NotifyPerformanceTargetApprovalAsync(
+                targetId,
+                targetOwnerUserId,
+                request.IsApproved
+            );
+            
             return true;
         }
 
@@ -639,6 +653,15 @@ namespace UniversityDashBoardProject.Infrastructure.Services
             }
 
             await _context.SaveChangesAsync();
+            
+            // Bildirim gönder
+            var progressOwnerUserId = progress.EnteredBy;
+            await _notificationService.NotifyPerformanceTargetProgressApprovalAsync(
+                progressId,
+                progressOwnerUserId,
+                request.IsApproved
+            );
+            
             return true;
         }
 
