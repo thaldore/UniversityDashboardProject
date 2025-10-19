@@ -5,6 +5,9 @@ using UniversityDashBoardProject.Domain.Entities;
 using UniversityDashBoardProject.Infrastructure.Persistence;
 using UniversityDashBoardProject.Domain.Services;
 using Serilog;
+using OfficeOpenXml;
+using OfficeOpenXml.Style;
+using System.Drawing;
 
 namespace UniversityDashBoardProject.Infrastructure.Services
 {
@@ -550,6 +553,114 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 .ToListAsync();
 
             return users;
+        }
+
+        public async Task<byte[]> ExportIndicatorsToExcelAsync()
+        {
+            _logger.Information("Exporting indicators to Excel");
+            
+            // Set EPPlus license context
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+            
+            var indicators = await _context.Indicators
+                .Include(i => i.Department)
+                .Include(i => i.AssignedUser)
+                .Include(i => i.RootValues.OrderBy(rv => rv.SortOrder))
+                .OrderBy(i => i.IndicatorCode)
+                .ToListAsync();
+            
+            using var package = new ExcelPackage();
+            var worksheet = package.Workbook.Worksheets.Add("Göstergeler");
+            
+            // Header
+            var headerRow = 1;
+            worksheet.Cells[headerRow, 1].Value = "Gösterge Kodu";
+            worksheet.Cells[headerRow, 2].Value = "Gösterge Adı";
+            worksheet.Cells[headerRow, 3].Value = "Açıklama";
+            worksheet.Cells[headerRow, 4].Value = "Departman";
+            worksheet.Cells[headerRow, 5].Value = "Veri Tipi";
+            worksheet.Cells[headerRow, 6].Value = "Periyot Tipi";
+            worksheet.Cells[headerRow, 7].Value = "Kök Değerler";
+            worksheet.Cells[headerRow, 8].Value = "Atanan Kullanıcı";
+            worksheet.Cells[headerRow, 9].Value = "Durum";
+            worksheet.Cells[headerRow, 10].Value = "Oluşturma Tarihi";
+            
+            // Header styling
+            using (var range = worksheet.Cells[headerRow, 1, headerRow, 10])
+            {
+                range.Style.Font.Bold = true;
+                range.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                range.Style.Fill.BackgroundColor.SetColor(Color.FromArgb(79, 129, 189));
+                range.Style.Font.Color.SetColor(Color.White);
+                range.Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+                range.Style.Border.BorderAround(ExcelBorderStyle.Thin);
+            }
+            
+            // Data
+            var row = 2;
+            foreach (var indicator in indicators)
+            {
+                worksheet.Cells[row, 1].Value = indicator.IndicatorCode;
+                worksheet.Cells[row, 2].Value = indicator.IndicatorName;
+                worksheet.Cells[row, 3].Value = indicator.Description ?? "-";
+                worksheet.Cells[row, 4].Value = indicator.Department?.DepartmentName ?? "-";
+                worksheet.Cells[row, 5].Value = GetDataTypeName(indicator.DataType);
+                worksheet.Cells[row, 6].Value = GetPeriodTypeName(indicator.PeriodType);
+                worksheet.Cells[row, 7].Value = string.Join(", ", indicator.RootValues.Select(rv => rv.RootValue));
+                worksheet.Cells[row, 8].Value = indicator.AssignedUser != null 
+                    ? $"{indicator.AssignedUser.FirstName} {indicator.AssignedUser.LastName}" 
+                    : "-";
+                worksheet.Cells[row, 9].Value = indicator.IsActive ? "Aktif" : "Pasif";
+                worksheet.Cells[row, 10].Value = indicator.CreatedAt.ToString("dd.MM.yyyy HH:mm");
+                
+                // Alternate row coloring
+                if (row % 2 == 0)
+                {
+                    using var rowRange = worksheet.Cells[row, 1, row, 10];
+                    rowRange.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    rowRange.Style.Fill.BackgroundColor.SetColor(Color.FromArgb(217, 225, 242));
+                }
+                
+                row++;
+            }
+            
+            // Auto-fit columns
+            worksheet.Cells.AutoFitColumns(10, 50);
+            
+            // Add borders
+            var dataRange = worksheet.Cells[1, 1, row - 1, 10];
+            dataRange.Style.Border.Top.Style = ExcelBorderStyle.Thin;
+            dataRange.Style.Border.Left.Style = ExcelBorderStyle.Thin;
+            dataRange.Style.Border.Right.Style = ExcelBorderStyle.Thin;
+            dataRange.Style.Border.Bottom.Style = ExcelBorderStyle.Thin;
+            
+            _logger.Information("Excel export completed with {Count} indicators", indicators.Count);
+            
+            return package.GetAsByteArray();
+        }
+
+        private string GetDataTypeName(Domain.Enums.IndicatorDataType dataType)
+        {
+            return dataType switch
+            {
+                Domain.Enums.IndicatorDataType.Number => "Sayısal",
+                Domain.Enums.IndicatorDataType.Percentage => "Yüzde",
+                Domain.Enums.IndicatorDataType.Currency => "Para Birimi",
+                Domain.Enums.IndicatorDataType.Other => "Diğer",
+                _ => "Bilinmeyen"
+            };
+        }
+
+        private string GetPeriodTypeName(Domain.Enums.PeriodType periodType)
+        {
+            return periodType switch
+            {
+                Domain.Enums.PeriodType.Quarter => "Çeyrek Yıl",
+                Domain.Enums.PeriodType.HalfYear => "Yarı Yıl",
+                Domain.Enums.PeriodType.Year => "Yıl",
+                Domain.Enums.PeriodType.TwoYear => "İki Yıl",
+                _ => "Bilinmeyen"
+            };
         }
     }
 }

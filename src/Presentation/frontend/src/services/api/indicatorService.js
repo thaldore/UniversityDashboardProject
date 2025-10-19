@@ -65,6 +65,14 @@ const indicatorService = {
     getUsersByDepartment: async (departmentId) => {
         const response = await apiClient.get(`/indicator/users/department/${departmentId}`);
         return response.data;
+    },
+
+    // Excel dışa aktarım
+    exportToExcel: async () => {
+        const response = await apiClient.get('/indicator/export/excel', {
+            responseType: 'blob'
+        });
+        return response.data;
     }
 };
 

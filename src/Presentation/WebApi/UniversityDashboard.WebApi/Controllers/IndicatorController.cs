@@ -335,6 +335,33 @@ namespace UniversityDashBoardProject.Presentation.WebApi.Controllers
             }
         }
 
+        /// <summary>
+        /// Göstergeleri Excel olarak dışa aktarır (Sadece Admin)
+        /// </summary>
+        [HttpGet("export/excel")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ExportToExcel()
+        {
+            _logger.Information("Exporting indicators to Excel by user: {UserId}", GetCurrentUserId());
+            
+            try
+            {
+                var query = new ExportIndicatorsToExcelQuery();
+                var excelData = await _mediator.Send(query);
+                
+                var fileName = $"Gostergeler_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+                
+                return File(excelData, 
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                    fileName);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error exporting indicators to Excel");
+                return StatusCode(500, new { message = "Excel dışa aktarımı sırasında bir hata oluştu." });
+            }
+        }
+
         private int GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst("id") ?? User.FindFirst(ClaimTypes.NameIdentifier);

@@ -16,6 +16,7 @@ const IndicatorListPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
     const [expandedRootValues, setExpandedRootValues] = useState(new Set());
+    const [exporting, setExporting] = useState(false);
 
     // Rol kontrolü - sadece Admin erişebilir
     const isAdmin = user?.roles?.includes('Admin');
@@ -101,6 +102,61 @@ const IndicatorListPage = () => {
         });
     };
 
+    const handleExportToExcel = async () => {
+        if (!window.confirm('Gösterge listesini Excel olarak indirmek istiyor musunuz?\n\nDosya tarayıcınızın varsayılan indirme klasörüne kaydedilecektir.')) {
+            return;
+        }
+
+        setExporting(true);
+        setError('');
+
+        try {
+            const blobData = await indicatorService.exportToExcel();
+            
+            console.log('Blob received:', blobData);
+            console.log('Blob type:', typeof blobData);
+            console.log('Is Blob:', blobData instanceof Blob);
+            
+            // Blob'un doğru şekilde oluşturulduğundan emin ol
+            const blob = new Blob([blobData], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+            });
+            
+            console.log('Created Blob:', blob);
+            console.log('Blob size:', blob.size);
+            
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            
+            // Dosya adı - Tarayıcının indirme klasörüne indirilecek
+            const fileName = `Gostergeler_${new Date().toISOString().split('T')[0]}.xlsx`;
+            link.download = fileName;
+            
+            // DOM'a ekle, tıkla ve temizle
+            document.body.appendChild(link);
+            link.click();
+            
+            // Cleanup
+            setTimeout(() => {
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+            
+            // Başarı mesajı
+            setError(''); // Hata mesajını temizle
+            alert(`✅ Excel dosyası başarıyla indirildi!\n\nDosya adı: ${fileName}\n\nDosya tarayıcınızın varsayılan indirme klasöründe (genellikle "İndirilenler" klasörü) bulunmaktadır.`);
+        } catch (err) {
+            console.error('Export error:', err);
+            console.error('Error details:', err.message);
+            console.error('Error stack:', err.stack);
+            setError(`Excel dışa aktarımı sırasında bir hata oluştu: ${err.message || 'Bilinmeyen hata'}`);
+        } finally {
+            setExporting(false);
+        }
+    };
+
     const filteredIndicators = indicators.filter(indicator => {
         const matchesSearch = indicator.indicatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             indicator.indicatorCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -138,12 +194,35 @@ const IndicatorListPage = () => {
                     <h1 className="page-title">Gösterge Yönetimi</h1>
                     <p className="page-subtitle">Sistem göstergelerini görüntüleyin ve yönetin</p>
                 </div>
-                <Link to="/indicators/new" className="btn btn-primary btn-large">
-                    <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Yeni Gösterge Ekle
-                </Link>
+                <div className="header-actions">
+                    <button 
+                        className="btn btn-secondary btn-large"
+                        onClick={handleExportToExcel}
+                        disabled={exporting || loading}
+                    >
+                        {exporting ? (
+                            <>
+                                <svg className="icon spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                İndiriliyor...
+                            </>
+                        ) : (
+                            <>
+                                <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Excel'e Aktar
+                            </>
+                        )}
+                    </button>
+                    <Link to="/indicators/new" className="btn btn-primary btn-large">
+                        <svg className="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Yeni Gösterge Ekle
+                    </Link>
+                </div>
             </div>
 
             {error && <ErrorMessage message={error} />}

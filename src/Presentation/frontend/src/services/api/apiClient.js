@@ -71,24 +71,24 @@ class ApiClient {
     window.location.href = '/auth/login';
   }
 
-  get(endpoint) {
-    return this.client.get(endpoint);
+  get(endpoint, config) {
+    return this.client.get(endpoint, config);
   }
 
-  post(endpoint, data) {
-    return this.client.post(endpoint, data);
+  post(endpoint, data, config) {
+    return this.client.post(endpoint, data, config);
   }
 
-  put(endpoint, data) {
-    return this.client.put(endpoint, data);
+  put(endpoint, data, config) {
+    return this.client.put(endpoint, data, config);
   }
 
-  patch(endpoint, data) {
-    return this.client.patch(endpoint, data);
+  patch(endpoint, data, config) {
+    return this.client.patch(endpoint, data, config);
   }
 
-  delete(endpoint) {
-    return this.client.delete(endpoint);
+  delete(endpoint, config) {
+    return this.client.delete(endpoint, config);
   }
 }
 

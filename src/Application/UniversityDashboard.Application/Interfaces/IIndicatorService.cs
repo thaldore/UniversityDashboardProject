@@ -15,5 +15,6 @@ namespace UniversityDashBoardProject.Application.Interfaces
         Task<bool> SaveIndicatorDataAsync(SaveIndicatorDataRequest request, int userId);
         Task<List<DepartmentDto>> GetDepartmentsAsync();
         Task<List<UserDto>> GetUsersByDepartmentAsync(int departmentId);
+        Task<byte[]> ExportIndicatorsToExcelAsync();
     }
 }

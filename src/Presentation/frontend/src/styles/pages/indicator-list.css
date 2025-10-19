@@ -20,6 +20,11 @@
     border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
 .header-content h1 {
     font-size: 2.5rem;
     font-weight: 700;
@@ -64,6 +69,24 @@
     box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
 }
 
+.btn-secondary {
+    background: linear-gradient(135deg, #64748b, #475569);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: linear-gradient(135deg, #475569, #334155);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(100, 116, 139, 0.3);
+}
+
+.btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 .btn-large {
     padding: 1rem 2rem;
     font-size: 1rem;
@@ -72,6 +95,19 @@
 .btn .icon {
     width: 1.25rem;
     height: 1.25rem;
+}
+
+.btn .icon.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Filtreler Bölümü */
