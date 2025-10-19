@@ -182,7 +182,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                 "Yeni Gösterge Oluşturuldu",
                 $"{indicator.IndicatorName} göstergesi için veri girişi yapmanız bekleniyor.",
                 NotificationType.IndicatorDataEntryRequired,
-                $"/indicators/data-entry/{indicatorId}",
+                "/indicators/data-entry", // Genel veri giriş sayfası
                 "Indicator",
                 indicatorId
             );
@@ -195,7 +195,7 @@ namespace UniversityDashBoardProject.Infrastructure.Services
                     "Yeni Gösterge Oluşturuldu",
                     $"{indicator.IndicatorName} göstergesi oluşturuldu ve veri girişi için atandı.",
                     NotificationType.IndicatorCreated,
-                    $"/indicators/{indicatorId}",
+                    "/indicators/data-entry", // Genel veri giriş sayfası
                     "Indicator",
                     indicatorId
                 );
